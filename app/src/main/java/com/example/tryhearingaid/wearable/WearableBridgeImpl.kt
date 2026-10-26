@@ -13,8 +13,13 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.example.tryhearingaid.data.BluetoothDeviceInfo
 import com.example.tryhearingaid.data.CaptionSegment
 import com.example.tryhearingaid.data.SoundAlert
@@ -133,6 +138,25 @@ open class WearableBridgeImpl @Inject constructor(
     private val _reconnectTimeoutMessages = MutableSharedFlow<String>(extraBufferCapacity = 16)
     val reconnectTimeoutMessages: SharedFlow<String> = _reconnectTimeoutMessages.asSharedFlow()
 
+    /**
+     * Hardware addresses of the connected Bluetooth devices that can play audio
+     * (A2DP sinks). The audio service observes this to route processed audio to a
+     * connected hearing aid / earbud automatically (Requirement 14.2).
+     *
+     * This is a subset of [connectedDevices]: a smartwatch or BLE-only device that
+     * cannot play audio is never listed here.
+     */
+    private val _audioOutputAddresses = MutableStateFlow<Set<String>>(emptySet())
+    val audioOutputAddresses: StateFlow<Set<String>> = _audioOutputAddresses.asStateFlow()
+
+    /**
+     * Replace the set of A2DP audio-output addresses directly.
+     * Exposed so tests can simulate A2DP connect/disconnect without hardware.
+     */
+    fun setAudioOutputAddresses(addresses: Set<String>) {
+        _audioOutputAddresses.value = addresses
+    }
+
     // ── Test-verification state ────────────────────────────────────────────────
     //  These record every alert/caption forwarded to wearables so that tests can
     //  verify the routing behaviour without real Bluetooth hardware.
@@ -187,6 +211,15 @@ open class WearableBridgeImpl @Inject constructor(
     private var headsetProxy: BluetoothHeadset? = null
 
     // ── Pure / testable helpers ───────────────────────────────────────────────
+
+    /**
+     * Apply one A2DP connection-state change to the set of audio-output addresses.
+     *
+     * [state] is a [BluetoothProfile] state constant. Only a fully connected device is
+     * an audio output; connecting, disconnecting and disconnected devices are not.
+     */
+    fun applyA2dpState(current: Set<String>, address: String, state: Int): Set<String> =
+        if (state == BluetoothProfile.STATE_CONNECTED) current + address else current - address
 
     /**
      * Parse a raw battery-level byte into an [Int] in `[0, 100]`, or `null` when the
@@ -714,6 +747,7 @@ open class WearableBridgeImpl @Inject constructor(
                 BluetoothProfile.A2DP -> {
                     a2dpProxy = proxy as? BluetoothA2dp
                     registerClassicDevices(a2dpProxy?.connectedDevices)
+                    _audioOutputAddresses.value = currentA2dpAddresses()
                 }
                 BluetoothProfile.HEADSET -> {
                     headsetProxy = proxy as? BluetoothHeadset
@@ -724,18 +758,73 @@ open class WearableBridgeImpl @Inject constructor(
 
         override fun onServiceDisconnected(profile: Int) {
             when (profile) {
-                BluetoothProfile.A2DP -> a2dpProxy = null
+                BluetoothProfile.A2DP -> {
+                    a2dpProxy = null
+                    _audioOutputAddresses.value = emptySet()
+                }
                 BluetoothProfile.HEADSET -> headsetProxy = null
             }
         }
     }
 
+    /** Addresses of the A2DP devices the proxy currently reports as connected. */
+    @SuppressLint("MissingPermission")
+    private fun currentA2dpAddresses(): Set<String> = try {
+        a2dpProxy?.connectedDevices?.mapNotNull { it.address }?.toSet() ?: emptySet()
+    } catch (e: SecurityException) {
+        Log.w(TAG, "A2DP connectedDevices denied (BLUETOOTH_CONNECT): ${e.message}")
+        emptySet()
+    } catch (e: Exception) {
+        Log.w(TAG, "A2DP connectedDevices failed: ${e.message}")
+        emptySet()
+    }
+
+    /** Read the [BluetoothDevice] extra from a Bluetooth broadcast on any API level. */
+    @Suppress("DEPRECATION")
+    private fun extractDevice(intent: Intent): BluetoothDevice? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+        } else {
+            intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+        }
+
     /**
-     * Request A2DP and HFP profile proxies and register currently-connected classic
-     * devices (Requirement 14.1).
+     * Tracks A2DP connect / disconnect so audio routing follows the hearing aid or
+     * earbuds as they come and go (Requirement 14.2).
+     */
+    private val a2dpStateReceiver = object : BroadcastReceiver() {
+        @SuppressLint("MissingPermission")
+        override fun onReceive(receiverContext: Context?, receivedIntent: Intent?) {
+            val intent: Intent = receivedIntent ?: return
+            if (intent.action != BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED) return
+            val device: BluetoothDevice? = extractDevice(intent)
+            if (device == null) return
+            val address: String = device.address ?: return
+            val state = intent.getIntExtra(
+                BluetoothProfile.EXTRA_STATE,
+                BluetoothProfile.STATE_DISCONNECTED
+            )
+            _audioOutputAddresses.update { applyA2dpState(it, address, state) }
+            when (state) {
+                BluetoothProfile.STATE_CONNECTED -> registerClassicDevices(listOf(device))
+                BluetoothProfile.STATE_DISCONNECTED -> removeConnectedDevice(address)
+            }
+        }
+    }
+
+    /** True once [setupClassicProfiles] has run, so repeated calls are harmless. */
+    @Volatile
+    private var classicSetupDone = false
+
+    /**
+     * Request A2DP and HFP profile proxies, register currently-connected classic
+     * devices and start listening for A2DP connect/disconnect (Requirement 14.1, 14.2).
+     *
+     * Safe to call more than once: only the first call has an effect.
      */
     @SuppressLint("MissingPermission")
     fun setupClassicProfiles() {
+        if (classicSetupDone) return
         val adapter = bluetoothAdapter ?: run {
             Log.w(TAG, "BluetoothAdapter unavailable; classic profiles not set up.")
             return
@@ -743,6 +832,13 @@ open class WearableBridgeImpl @Inject constructor(
         try {
             adapter.getProfileProxy(context, profileServiceListener, BluetoothProfile.A2DP)
             adapter.getProfileProxy(context, profileServiceListener, BluetoothProfile.HEADSET)
+            ContextCompat.registerReceiver(
+                context,
+                a2dpStateReceiver,
+                IntentFilter(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            classicSetupDone = true
             Log.i(TAG, "Classic A2DP/HFP profile proxies requested.")
         } catch (e: SecurityException) {
             Log.w(TAG, "getProfileProxy denied (BLUETOOTH_CONNECT): ${e.message}")
@@ -832,6 +928,15 @@ open class WearableBridgeImpl @Inject constructor(
         }
         a2dpProxy = null
         headsetProxy = null
+        if (classicSetupDone) {
+            try {
+                context.unregisterReceiver(a2dpStateReceiver)
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "A2DP receiver was not registered: ${e.message}")
+            }
+            classicSetupDone = false
+        }
+        _audioOutputAddresses.value = emptySet()
         scope.cancel()
     }
 }

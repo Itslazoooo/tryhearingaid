@@ -19,18 +19,25 @@ import com.example.tryhearingaid.audio.AudioConfig
 import com.example.tryhearingaid.audio.AudioDevice
 import com.example.tryhearingaid.audio.AudioEngineImpl
 import com.example.tryhearingaid.audio.AudioEngineState
+import com.example.tryhearingaid.audio.AudioRoutePolicy
 import com.example.tryhearingaid.audio.DirectionalFilterImpl
 import com.example.tryhearingaid.audio.EqualizerImpl
 import com.example.tryhearingaid.audio.NoiseReducerImpl
 import com.example.tryhearingaid.audio.VoiceIsolatorImpl
+import com.example.tryhearingaid.captions.CaptionEngine
 import com.example.tryhearingaid.classification.EmergencyDetectorImpl
 import com.example.tryhearingaid.classification.SoundClassifierImpl
+import com.example.tryhearingaid.wearable.CaptionForwarder
 import com.example.tryhearingaid.wearable.WearableBridgeImpl
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -46,6 +53,7 @@ import kotlinx.coroutines.launch
  *   immediately in [onStartCommand] to satisfy Android's foreground-service
  *   requirements and prevent OS termination during active audio processing.
  */
+@AndroidEntryPoint
 class AudioProcessingService : Service() {
 
     // ── Notification constants ────────────────────────────────────────────────
@@ -116,8 +124,21 @@ class AudioProcessingService : Service() {
      * The service observes [WearableBridgeImpl.connectedDevices] and automatically
      * routes the [AudioEngineImpl] output to a connected A2DP device, satisfying
      * Requirement 14.2.
+     *
+     * Injected by Hilt so this is the *same* singleton the notification dispatcher
+     * uses; a privately constructed bridge would have its own empty device list.
+     * Available from [onCreate] after `super.onCreate()`.
      */
-    private lateinit var wearableBridge: WearableBridgeImpl
+    @Inject
+    lateinit var wearableBridge: WearableBridgeImpl
+
+    /**
+     * The app-wide [CaptionEngine] singleton, shared with the caption ViewModel.
+     * The service observes its captions to forward them to display-capable
+     * wearables (Requirement 14.6) even when the UI is in the background.
+     */
+    @Inject
+    lateinit var captionEngine: CaptionEngine
 
     /**
      * Coroutine scope used to observe wearable connection state and drive
@@ -209,6 +230,44 @@ class AudioProcessingService : Service() {
         emergencyDetector = EmergencyDetectorImpl(soundClassifier)
         emergencyDetector.start()
         Log.d(TAG, "EmergencyDetector started — always-on subscription active.")
+
+        startWearableIntegration()
+    }
+
+    /**
+     * Connects the audio pipeline to Bluetooth wearables.
+     *
+     * 1. Starts classic (A2DP / HFP) discovery so already-paired hearing aids and
+     *    earbuds are found. BLE scanning is deliberately *not* started here:
+     *    [WearableBridgeImpl.startBleScan] currently connects to every BLE device it
+     *    sees, so it needs a device filter / user-initiated pairing flow first.
+     * 2. Follows the connected A2DP devices and routes processed audio to them,
+     *    falling back to the default output when none is connected (Req 14.2).
+     * 3. Forwards each new caption to display-capable wearables (Req 14.6).
+     */
+    private fun startWearableIntegration() {
+        wearableBridge.setupClassicProfiles()
+
+        serviceScope.launch {
+            var currentRoute: AudioDevice = AudioDevice.Default
+            wearableBridge.audioOutputAddresses
+                .map { addresses -> AudioRoutePolicy.choose(addresses) }
+                .distinctUntilChanged()
+                .collect { route ->
+                    // routeOutput() restarts a running engine, so only call it on a real change.
+                    if (route != currentRoute) {
+                        currentRoute = route
+                        audioEngine.routeOutput(route)
+                    }
+                }
+        }
+
+        val captionForwarder = CaptionForwarder()
+        serviceScope.launch {
+            captionEngine.captions.collect { segments ->
+                captionForwarder.newSegments(segments).forEach { wearableBridge.sendCaptions(it) }
+            }
+        }
     }
 
     /**
@@ -257,6 +316,9 @@ class AudioProcessingService : Service() {
         emergencyDetector.stop()
         soundClassifier.close()
         audioEngine.stop()
+        // Stop following wearable state. The bridge itself is an app-wide singleton
+        // shared with the dispatcher, so it is not released here.
+        serviceScope.cancel()
         super.onDestroy()
     }
 
