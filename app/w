@@ -1,0 +1,126 @@
+package com.example.soundamplifier
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+@Composable
+fun AmplifierScreen() {
+    var isAmplifierActive by remember { mutableStateOf(false) }
+    var amplificationVolume by remember { mutableStateOf(50f) }
+    var noiseReductionLevel by remember { mutableStateOf(0.3f) }
+    var voiceIsolationEnabled by remember { mutableStateOf(false) }
+    var directionalHearingEnabled by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Status Card (Features 1 & 9: Shows active profiling)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isAmplifierActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+            ),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = if (isAmplifierActive) "Audio Enhancement: ACTIVE" else "Amplifier Paused",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (isAmplifierActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "AI Detected Environment: Classroom / Lecture Hall",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isAmplifierActive) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                )
+            }
+        }
+
+        // Master Enable Toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Enable Sound Expansion", style = MaterialTheme.typography.titleMedium)
+            Switch(
+                checked = isAmplifierActive,
+                onCheckedChange = { isAmplifierActive = it }
+            )
+        }
+
+        Divider()
+
+        // Core Controls (Disabled if master switch is off)
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // Volume Slider
+            Column {
+                Text("Amplification Boost", style = MaterialTheme.typography.bodyLarge)
+                Slider(
+                    value = amplificationVolume,
+                    onValueChange = { amplificationVolume = it },
+                    valueRange = 0f..100f,
+                    enabled = isAmplifierActive
+                )
+            }
+
+            // AI Noise Reduction Slider
+            Column {
+                Text("AI Noise Reduction (Wind/Traffic)", style = MaterialTheme.typography.bodyLarge)
+                Slider(
+                    value = noiseReductionLevel,
+                    onValueChange = { noiseReductionLevel = it },
+                    valueRange = 0f..1f,
+                    enabled = isAmplifierActive
+                )
+            }
+
+            // DSP Feature Toggles Grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Voice Isolation Toggle
+                FilterChip(
+                    modifier = Modifier.weight(1f),
+                    selected = voiceIsolationEnabled,
+                    onClick = { if(isAmplifierActive) voiceIsolationEnabled = !voiceIsolationEnabled },
+                    label = { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Voice Isolate") } },
+                    enabled = isAmplifierActive
+                )
+
+                // Directional Focus Toggle
+                FilterChip(
+                    modifier = Modifier.weight(1f),
+                    selected = directionalHearingEnabled,
+                    onClick = { if(isAmplifierActive) directionalHearingEnabled = !directionalHearingEnabled },
+                    label = { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Front Focus") } },
+                    enabled = isAmplifierActive
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Hearing Fingerprint Shortcut Button (Feature 10)
+        Button(
+            onClick = { /* Navigate to hearing calibration test */ },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("Calibrate Personal Hearing Profile (Audiogram)")
+        }
+    }
+}

@@ -1,0 +1,350 @@
+#
+# There is insufficient memory for the Java Runtime Environment to continue.
+# Native memory allocation (malloc) failed to allocate 1048576 bytes. Error detail: AllocateHeap
+# Possible reasons:
+#   The system is out of physical RAM or swap space
+#   This process is running with CompressedOops enabled, and the Java Heap may be blocking the growth of the native heap
+# Possible solutions:
+#   Reduce memory load on the system
+#   Increase physical memory or swap space
+#   Check if swap backing store is full
+#   Decrease Java heap size (-Xmx/-Xms)
+#   Decrease number of Java threads
+#   Decrease Java thread stack sizes (-Xss)
+#   Set larger code cache with -XX:ReservedCodeCacheSize=
+#   JVM is running with Unscaled Compressed Oops mode in which the Java heap is
+#     placed in the first 4GB address space. The Java Heap base address is the
+#     maximum limit for the native heap growth. Please use -XX:HeapBaseMinAddress
+#     to set the Java Heap base and to place the Java Heap above 4GB virtual address.
+# This output file may be truncated or incomplete.
+#
+#  Out of Memory Error (allocation.cpp:44), pid=8768, tid=6352
+#
+# JRE version:  (21.0.10+7) (build )
+# Java VM: OpenJDK 64-Bit Server VM (21.0.10+7-LTS, mixed mode, tiered, compressed oops, compressed class ptrs, parallel gc, windows-amd64)
+# No core dump will be written. Minidumps are not enabled by default on client versions of Windows
+#
+
+---------------  S U M M A R Y ------------
+
+Command Line: --add-modules=ALL-SYSTEM --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/sun.nio.fs=ALL-UNNAMED -Declipse.application=org.eclipse.jdt.ls.core.id1 -Dosgi.bundles.defaultStartLevel=4 -Declipse.product=org.eclipse.jdt.ls.core.product -Djava.import.generatesMetadataFilesAtProjectRoot=false -DDetectVMInstallationsJob.disabled=true -Dfile.encoding=utf8 -XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx2G -Xms100m -Xlog:disable -javaagent:c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\lombok\lombok-1.18.39-4050.jar -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=c:\Users\Only Lazo\AppData\Roaming\Code\User\workspaceStorage\1890d31add9e84c3580b2f0d3ef773f5\redhat.java -Daether.dependencyCollector.impl=bf c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\server\plugins\org.eclipse.equinox.launcher_1.7.100.v20251111-0406.jar -configuration c:\Users\Only Lazo\AppData\Roaming\Code\User\globalStorage\redhat.java\1.54.0\config_win -data c:\Users\Only Lazo\AppData\Roaming\Code\User\workspaceStorage\1890d31add9e84c3580b2f0d3ef773f5\redhat.java\jdt_ws --pipe=\\.\pipe\lsp-3cd54d058bcf3c5597c8409c2c1d55cd-sock
+
+Host: Intel(R) Core(TM) i5-5300U CPU @ 2.30GHz, 4 cores, 15G,  Windows 11 , 64 bit Build 22621 (10.0.22621.4391)
+Time: Wed Jun 17 15:02:29 2026 Malay Peninsula Standard Time elapsed time: 0.299409 seconds (0d 0h 0m 0s)
+
+---------------  T H R E A D  ---------------
+
+Current thread (0x000001f0c16ad5c0):  JavaThread "Unknown thread" [_thread_in_vm, id=6352, stack(0x0000005ff2200000,0x0000005ff2300000) (1024K)]
+
+Stack: [0x0000005ff2200000,0x0000005ff2300000]
+Native frames: (J=compiled Java code, j=interpreted, Vv=VM code, C=native code)
+V  [jvm.dll+0x6d7a39]
+V  [jvm.dll+0x8b4b26]
+V  [jvm.dll+0x8b70de]
+V  [jvm.dll+0x8b77c3]
+V  [jvm.dll+0x284346]
+V  [jvm.dll+0xc1277]
+V  [jvm.dll+0x70ba02]
+V  [jvm.dll+0x70c73c]
+V  [jvm.dll+0x6e65d3]
+V  [jvm.dll+0x87f17c]
+V  [jvm.dll+0x3c49fc]
+V  [jvm.dll+0x867e6b]
+V  [jvm.dll+0x457b31]
+V  [jvm.dll+0x459721]
+C  [jli.dll+0x52d0]
+C  [ucrtbase.dll+0x29333]
+C  [KERNEL32.DLL+0x1259d]
+C  [ntdll.dll+0x5af38]
+
+
+---------------  P R O C E S S  ---------------
+
+Threads class SMR info:
+_java_thread_list=0x000001f0c319f910, length=1, elements={
+0x000001f0c16ad5c0
+}
+
+Java Threads: ( => current thread )
+=>0x000001f0c16ad5c0 JavaThread "Unknown thread"             [_thread_in_vm, id=6352, stack(0x0000005ff2200000,0x0000005ff2300000) (1024K)]
+Total: 1
+
+Other Threads:
+  0x000001f0c31e0250 WatcherThread "VM Periodic Task Thread"        [id=13984, stack(0x0000005ff2400000,0x0000005ff2500000) (1024K)]
+  0x000001f0c3192690 WorkerThread "GC Thread#0"                     [id=9612, stack(0x0000005ff2300000,0x0000005ff2400000) (1024K)]
+Total: 2
+
+Threads with active compile tasks:
+Total: 0
+
+VM state: not at safepoint (normal execution)
+
+VM Mutex/Monitor currently owned by a thread: None
+
+Heap address: 0x0000000080000000, size: 2048 MB, Compressed Oops mode: 32-bit
+
+CDS archive(s) not mapped
+Compressed class space mapped at: 0x0000000100000000-0x0000000140000000, reserved size: 1073741824
+Narrow klass base: 0x0000000000000000, Narrow klass shift: 3, Narrow klass range: 0x140000000
+
+GC Precious Log:
+ CardTable entry size: 512
+ CPUs: 4 total, 4 available
+ Memory: 16259M
+ Large Page Support: Disabled
+ NUMA Support: Disabled
+ Compressed Oops: Enabled (32-bit)
+ Alignments: Space 512K, Generation 512K, Heap 2M
+ Heap Min Capacity: 100M
+ Heap Initial Capacity: 100M
+ Heap Max Capacity: 2G
+ Pre-touch: Disabled
+ Parallel Workers: 4
+
+Heap:
+ PSYoungGen      total 29696K, used 512K [0x00000000d5580000, 0x00000000d7680000, 0x0000000100000000)
+  eden space 25600K, 2% used [0x00000000d5580000,0x00000000d5600070,0x00000000d6e80000)
+  from space 4096K, 0% used [0x00000000d7280000,0x00000000d7280000,0x00000000d7680000)
+  to   space 4096K, 0% used [0x00000000d6e80000,0x00000000d6e80000,0x00000000d7280000)
+ ParOldGen       total 68608K, used 0K [0x0000000080000000, 0x0000000084300000, 0x00000000d5580000)
+  object space 68608K, 0% used [0x0000000080000000,0x0000000080000000,0x0000000084300000)
+ Metaspace       used 1381K, committed 1408K, reserved 1114112K
+  class space    used 111K, committed 128K, reserved 1048576K
+
+Card table byte_map: [0x000001f0d5570000,0x000001f0d5980000] _byte_map_base: 0x000001f0d5170000
+
+Marking Bits: (ParMarkBitMap*) 0x00007ffe35863450
+ Begin Bits: [0x000001f0d5c30000, 0x000001f0d7c30000)
+ End Bits:   [0x000001f0d7c30000, 0x000001f0d9c30000)
+
+Polling page: 0x000001f0c1840000
+
+Metaspace:
+
+Usage:
+  Non-class:      1.24 MB used.
+      Class:    111.10 KB used.
+       Both:      1.35 MB used.
+
+Virtual space:
+  Non-class space:       64.00 MB reserved,       1.25 MB (  2%) committed,  1 nodes.
+      Class space:        1.00 GB reserved,     128.00 KB ( <1%) committed,  1 nodes.
+             Both:        1.06 GB reserved,       1.38 MB ( <1%) committed. 
+
+Chunk freelists:
+   Non-Class:  12.00 MB
+       Class:  15.75 MB
+        Both:  27.75 MB
+
+MaxMetaspaceSize: unlimited
+CompressedClassSpaceSize: 1.00 GB
+Initial GC threshold: 21.00 MB
+Current GC threshold: 17179869184.00 GB
+CDS: off
+ - commit_granule_bytes: 65536.
+ - commit_granule_words: 8192.
+ - virtual_space_node_default_size: 8388608.
+ - enlarge_chunks_in_place: 1.
+ - use_allocation_guard: 0.
+
+
+Internal statistics:
+
+num_allocs_failed_limit: 0.
+num_arena_births: 2.
+num_arena_deaths: 0.
+num_vsnodes_births: 2.
+num_vsnodes_deaths: 0.
+num_space_committed: 22.
+num_space_uncommitted: 0.
+num_chunks_returned_to_freelist: 0.
+num_chunks_taken_from_freelist: 3.
+num_chunk_merges: 0.
+num_chunk_splits: 2.
+num_chunks_enlarged: 0.
+num_inconsistent_stats: 0.
+
+CodeHeap 'non-profiled nmethods': size=120000Kb used=0Kb max_used=0Kb free=120000Kb
+ bounds [0x000001f0cde60000, 0x000001f0ce0d0000, 0x000001f0d5390000]
+CodeHeap 'profiled nmethods': size=120000Kb used=0Kb max_used=0Kb free=120000Kb
+ bounds [0x000001f0c6390000, 0x000001f0c6600000, 0x000001f0cd8c0000]
+CodeHeap 'non-nmethods': size=5760Kb used=194Kb max_used=342Kb free=5565Kb
+ bounds [0x000001f0cd8c0000, 0x000001f0cdb30000, 0x000001f0cde60000]
+CodeCache: size=245760Kb, used=194Kb, max_used=342Kb, free=245565Kb
+ total_blobs=70, nmethods=0, adapters=48, full_count=0
+Compilation: enabled, stopped_count=0, restarted_count=0
+
+Compilation events (0 events):
+No events
+
+GC Heap History (0 events):
+No events
+
+Dll operation events (2 events):
+Event: 0.016 Loaded shared library c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\java.dll
+Event: 0.106 Loaded shared library c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\zip.dll
+
+Deoptimization events (0 events):
+No events
+
+Classes loaded (20 events):
+Event: 0.199 Loading class java/util/Iterator
+Event: 0.199 Loading class java/util/Iterator done
+Event: 0.199 Loading class java/lang/reflect/RecordComponent
+Event: 0.199 Loading class java/lang/reflect/RecordComponent done
+Event: 0.199 Loading class jdk/internal/vm/vector/VectorSupport
+Event: 0.200 Loading class jdk/internal/vm/vector/VectorSupport done
+Event: 0.200 Loading class jdk/internal/vm/vector/VectorSupport$VectorPayload
+Event: 0.200 Loading class jdk/internal/vm/vector/VectorSupport$VectorPayload done
+Event: 0.200 Loading class jdk/internal/vm/vector/VectorSupport$Vector
+Event: 0.200 Loading class jdk/internal/vm/vector/VectorSupport$Vector done
+Event: 0.200 Loading class jdk/internal/vm/vector/VectorSupport$VectorMask
+Event: 0.200 Loading class jdk/internal/vm/vector/VectorSupport$VectorMask done
+Event: 0.200 Loading class jdk/internal/vm/vector/VectorSupport$VectorShuffle
+Event: 0.201 Loading class jdk/internal/vm/vector/VectorSupport$VectorShuffle done
+Event: 0.201 Loading class jdk/internal/vm/FillerObject
+Event: 0.201 Loading class jdk/internal/vm/FillerObject done
+Event: 0.257 Loading class java/lang/NullPointerException
+Event: 0.257 Loading class java/lang/NullPointerException done
+Event: 0.257 Loading class java/lang/ArithmeticException
+Event: 0.257 Loading class java/lang/ArithmeticException done
+
+Classes unloaded (0 events):
+No events
+
+Classes redefined (0 events):
+No events
+
+Internal exceptions (0 events):
+No events
+
+ZGC Phase Switch (0 events):
+No events
+
+VM Operations (0 events):
+No events
+
+Memory protections (0 events):
+No events
+
+Nmethod flushes (0 events):
+No events
+
+Events (1 events):
+Event: 0.097 Thread 0x000001f0c16ad5c0 Thread added: 0x000001f0c16ad5c0
+
+
+Dynamic libraries:
+0x00007ff7a1b10000 - 0x00007ff7a1b1e000 	c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\java.exe
+0x00007ffea2450000 - 0x00007ffea2667000 	C:\WINDOWS\SYSTEM32\ntdll.dll
+0x00007ffea11f0000 - 0x00007ffea12b4000 	C:\WINDOWS\System32\KERNEL32.DLL
+0x00007ffe9f9a0000 - 0x00007ffe9fd5a000 	C:\WINDOWS\System32\KERNELBASE.dll
+0x00007ffe9c8c0000 - 0x00007ffe9c957000 	C:\WINDOWS\SYSTEM32\apphelp.dll
+0x00007ffe9f880000 - 0x00007ffe9f991000 	C:\WINDOWS\System32\ucrtbase.dll
+0x00007ffe89390000 - 0x00007ffe893a8000 	c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\jli.dll
+0x00007ffea2020000 - 0x00007ffea21ce000 	C:\WINDOWS\System32\USER32.dll
+0x00007ffe9fe10000 - 0x00007ffe9fe36000 	C:\WINDOWS\System32\win32u.dll
+0x00007ffea0d30000 - 0x00007ffea0d59000 	C:\WINDOWS\System32\GDI32.dll
+0x00007ffe9fe40000 - 0x00007ffe9ff5b000 	C:\WINDOWS\System32\gdi32full.dll
+0x00007ffe9f720000 - 0x00007ffe9f7ba000 	C:\WINDOWS\System32\msvcp_win.dll
+0x00007ffe91940000 - 0x00007ffe9195e000 	c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\VCRUNTIME140.dll
+0x00007ffe8fbb0000 - 0x00007ffe8fe42000 	C:\WINDOWS\WinSxS\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.4541_none_2710d1c57384c085\COMCTL32.dll
+0x00007ffea0ae0000 - 0x00007ffea0b87000 	C:\WINDOWS\System32\msvcrt.dll
+0x00007ffea0cf0000 - 0x00007ffea0d21000 	C:\WINDOWS\System32\IMM32.DLL
+0x00007ffe8bdc0000 - 0x00007ffe8beb2000 	C:\Program Files\Windhawk\Engine\1.6.1\64\windhawk.dll
+0x00007ffea1ee0000 - 0x00007ffea1f92000 	C:\WINDOWS\System32\ADVAPI32.dll
+0x00007ffea21d0000 - 0x00007ffea2277000 	C:\WINDOWS\System32\sechost.dll
+0x00007ffe9fde0000 - 0x00007ffe9fe08000 	C:\WINDOWS\System32\bcrypt.dll
+0x00007ffea0960000 - 0x00007ffea0a74000 	C:\WINDOWS\System32\RPCRT4.dll
+0x00007ffe9adf0000 - 0x00007ffe9adfc000 	c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\vcruntime140_1.dll
+0x00007ffe7e0a0000 - 0x00007ffe7e12d000 	c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\msvcp140.dll
+0x00007ffe34ba0000 - 0x00007ffe35941000 	c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\server\jvm.dll
+0x00007ffea1fa0000 - 0x00007ffea2011000 	C:\WINDOWS\System32\WS2_32.dll
+0x00007ffe9e5b0000 - 0x00007ffe9e5fd000 	C:\WINDOWS\SYSTEM32\POWRPROF.dll
+0x00007ffe98fc0000 - 0x00007ffe98ff4000 	C:\WINDOWS\SYSTEM32\WINMM.dll
+0x00007ffe93300000 - 0x00007ffe9330a000 	C:\WINDOWS\SYSTEM32\VERSION.dll
+0x00007ffe9e590000 - 0x00007ffe9e5a3000 	C:\WINDOWS\SYSTEM32\UMPDC.dll
+0x00007ffe9e850000 - 0x00007ffe9e868000 	C:\WINDOWS\SYSTEM32\kernel.appcore.dll
+0x00007ffe99f50000 - 0x00007ffe99f5a000 	c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\jimage.dll
+0x00007ffe8f3d0000 - 0x00007ffe8f602000 	C:\WINDOWS\SYSTEM32\DBGHELP.DLL
+0x00007ffea0200000 - 0x00007ffea058f000 	C:\WINDOWS\System32\combase.dll
+0x00007ffea0590000 - 0x00007ffea0667000 	C:\WINDOWS\System32\OLEAUT32.dll
+0x00007ffe8e330000 - 0x00007ffe8e362000 	C:\WINDOWS\SYSTEM32\dbgcore.DLL
+0x00007ffea00d0000 - 0x00007ffea014b000 	C:\WINDOWS\System32\bcryptPrimitives.dll
+0x00007ffe924b0000 - 0x00007ffe924bf000 	c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\instrument.dll
+0x00007ffe89340000 - 0x00007ffe89360000 	c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\java.dll
+0x00007ffe881a0000 - 0x00007ffe881b8000 	c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\zip.dll
+
+JVMTI agents:
+c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\lombok\lombok-1.18.39-4050.jar path:none, loaded, not initialized, instrumentlib options:none
+
+dbghelp: loaded successfully - version: 4.0.5 - missing functions: none
+symbol engine: initialized successfully - sym options: 0x614 - pdb path: .;c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin;C:\WINDOWS\SYSTEM32;C:\WINDOWS\WinSxS\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.4541_none_2710d1c57384c085;C:\Program Files\Windhawk\Engine\1.6.1\64;c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\jre\21.0.10-win32-x86_64\bin\server
+
+VM Arguments:
+jvm_args: --add-modules=ALL-SYSTEM --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/sun.nio.fs=ALL-UNNAMED -Declipse.application=org.eclipse.jdt.ls.core.id1 -Dosgi.bundles.defaultStartLevel=4 -Declipse.product=org.eclipse.jdt.ls.core.product -Djava.import.generatesMetadataFilesAtProjectRoot=false -DDetectVMInstallationsJob.disabled=true -Dfile.encoding=utf8 -XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx2G -Xms100m -Xlog:disable -javaagent:c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\lombok\lombok-1.18.39-4050.jar -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=c:\Users\Only Lazo\AppData\Roaming\Code\User\workspaceStorage\1890d31add9e84c3580b2f0d3ef773f5\redhat.java -Daether.dependencyCollector.impl=bf 
+java_command: c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\server\plugins\org.eclipse.equinox.launcher_1.7.100.v20251111-0406.jar -configuration c:\Users\Only Lazo\AppData\Roaming\Code\User\globalStorage\redhat.java\1.54.0\config_win -data c:\Users\Only Lazo\AppData\Roaming\Code\User\workspaceStorage\1890d31add9e84c3580b2f0d3ef773f5\redhat.java\jdt_ws --pipe=\\.\pipe\lsp-3cd54d058bcf3c5597c8409c2c1d55cd-sock
+java_class_path (initial): c:\Users\Only Lazo\.vscode\extensions\redhat.java-1.54.0-win32-x64\server\plugins\org.eclipse.equinox.launcher_1.7.100.v20251111-0406.jar
+Launcher Type: SUN_STANDARD
+
+[Global flags]
+    uintx AdaptiveSizePolicyWeight                 = 90                                        {product} {command line}
+     intx CICompilerCount                          = 3                                         {product} {ergonomic}
+    uintx GCTimeRatio                              = 4                                         {product} {command line}
+     bool HeapDumpOnOutOfMemoryError               = true                                   {manageable} {command line}
+    ccstr HeapDumpPath                             = c:\Users\Only Lazo\AppData\Roaming\Code\User\workspaceStorage\1890d31add9e84c3580b2f0d3ef773f5\redhat.java         {manageable} {command line}
+   size_t InitialHeapSize                          = 104857600                                 {product} {command line}
+   size_t MaxHeapSize                              = 2147483648                                {product} {command line}
+   size_t MaxNewSize                               = 715653120                                 {product} {ergonomic}
+   size_t MinHeapDeltaBytes                        = 524288                                    {product} {ergonomic}
+   size_t MinHeapSize                              = 104857600                                 {product} {command line}
+   size_t NewSize                                  = 34603008                                  {product} {ergonomic}
+    uintx NonNMethodCodeHeapSize                   = 5832780                                {pd product} {ergonomic}
+    uintx NonProfiledCodeHeapSize                  = 122912730                              {pd product} {ergonomic}
+   size_t OldSize                                  = 70254592                                  {product} {ergonomic}
+    uintx ProfiledCodeHeapSize                     = 122912730                              {pd product} {ergonomic}
+    uintx ReservedCodeCacheSize                    = 251658240                              {pd product} {ergonomic}
+     bool SegmentedCodeCache                       = true                                      {product} {ergonomic}
+   size_t SoftMaxHeapSize                          = 2147483648                             {manageable} {ergonomic}
+     bool UseCompressedOops                        = true                           {product lp64_product} {ergonomic}
+     bool UseLargePagesIndividualAllocation        = false                                  {pd product} {ergonomic}
+     bool UseParallelGC                            = true                                      {product} {command line}
+
+Logging:
+Log output configuration:
+ #0: stdout all=off uptime,level,tags foldmultilines=false
+ #1: stderr all=off uptime,level,tags foldmultilines=false
+
+Release file:
+<release file has not been read>
+Environment Variables:
+PATH=C:\Users\Only Lazo\AppData\Local\Programs\Microsoft VS Code;C:\Program Files\Common Files\Oracle\Java\javapath;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\MinGW\bin;C:\Program Files\dotnet\;C:\ADB\;C:\Users\Only Lazo\AppData\Local\Microsoft\WindowsApps;C:\Users\Only Lazo\AppData\Local\Programs\Microsoft VS Code\bin;C:\msys64\ucrt64\bin;C:\Users\Only Lazo\AppData\Local\Programs\Kiro\bin
+USERNAME=Only Lazo
+OS=Windows_NT
+PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 61 Stepping 4, GenuineIntel
+TMP=C:\Users\ONLYLA~1\AppData\Local\Temp
+TEMP=C:\Users\ONLYLA~1\AppData\Local\Temp
+
+
+
+
+Periodic native trim disabled
+
+---------------  S Y S T E M  ---------------
+
+OS:
+ Windows 11 , 64 bit Build 22621 (10.0.22621.4391)
+OS uptime: 1 days 4:02 hours
+
+CPU: total 4 (initial active 4) (2 cores per cpu, 2 threads per core) family 6 model 61 stepping 4 microcode 0x2f, cx8, cmov, fxsr, ht, mmx, 3dnowpref, sse, sse2, sse3, ssse3, sse4.1, sse4.2, popcnt, lzcnt, tsc, tscinvbit, avx, avx2, aes, erms, clmul, bmi1, bmi2, rtm, adx, fma, vzeroupper, clflush, rdtscp, f16c
+Processor Information for the first 4 processors :
+  Max Mhz: 2295, Current Mhz: 2295, Mhz Limit: 2295
+
+Memory: 4k page, system-wide physical 16259M (4168M free)
+TotalPageFile size 16259M (AvailPageFile size 5M)
+current process WorkingSet (physical memory assigned to process): 18M, peak: 18M
+current process commit charge ("private bytes"): 185M, peak: 191M
+
+vm_info: OpenJDK 64-Bit Server VM (21.0.10+7-LTS) for windows-amd64 JRE (21.0.10+7-LTS), built on 2026-01-20T00:00:00Z by "admin" with MS VC++ 17.12 (VS2022)
+
+END.

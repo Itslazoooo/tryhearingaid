@@ -1,0 +1,398 @@
+{
+  "pbtResults": {
+    "8.5 Write property tests for CaptionEngine (Properties 7, 8, 9, 10)": {
+      "status": "passed",
+      "lastRunTimestamp": 1788768149914
+    },
+    "9.6 Write property tests for classification and dispatch (Properties 11, 12, 13, 14, 15)": {
+      "status": "passed",
+      "lastRunTimestamp": 1788768997865
+    },
+    "10.5 Write property tests for AnalyticsEngine (Properties 16, 17, 18, 19, 20)": {
+      "status": "passed",
+      "lastRunTimestamp": 1791354013060
+    }
+  },
+  "executionHistory": {
+    "14.1 Add `classroomMode` flow to `CaptionViewModel`: a single `activateClassroomMode()` call atomically enables `CaptionEngine.start()`, `AIAssistant` summarization subscription, and `TranscriptStore` session recording; on session end, call `aiAssistant.generateStudyNotes(transcript)` and persist the result": [
+      {
+        "executionId": "1450e719-d413-42ca-b04c-b98feea02fd6",
+        "chatSessionId": "sess_d34467a0-8748-4e29-ab8d-6e9441f68743",
+        "timestamp": 1788156056561
+      },
+      {
+        "executionId": "1450e719-d413-42ca-b04c-b98feea02fd6",
+        "chatSessionId": "sess_d34467a0-8748-4e29-ab8d-6e9441f68743",
+        "timestamp": 1788156959258
+      }
+    ],
+    "14.2 Implement keyword context lookup in `CaptionViewModel`: given a keyword from study notes, query `TranscriptStore` for surrounding segments and return them within 1 s": [
+      {
+        "executionId": "1450e719-d413-42ca-b04c-b98feea02fd6",
+        "chatSessionId": "sess_d34467a0-8748-4e29-ab8d-6e9441f68743",
+        "timestamp": 1788156061653
+      },
+      {
+        "executionId": "1450e719-d413-42ca-b04c-b98feea02fd6",
+        "chatSessionId": "sess_d34467a0-8748-4e29-ab8d-6e9441f68743",
+        "timestamp": 1788156965737
+      }
+    ],
+    "14.3 Implement audio recording alongside text transcript using `MediaRecorder` (when classroom mode active); save audio file path alongside `TranscriptSession` in Room": [
+      {
+        "executionId": "1450e719-d413-42ca-b04c-b98feea02fd6",
+        "chatSessionId": "sess_d34467a0-8748-4e29-ab8d-6e9441f68743",
+        "timestamp": 1788156065970
+      },
+      {
+        "executionId": "1450e719-d413-42ca-b04c-b98feea02fd6",
+        "chatSessionId": "sess_d34467a0-8748-4e29-ab8d-6e9441f68743",
+        "timestamp": 1788156969846
+      }
+    ],
+    "14.4 Write unit test: verify classroom mode atomically enables all three components; verify study notes generated contain all required fields; verify keyword lookup returns surrounding context": [
+      {
+        "executionId": "1450e719-d413-42ca-b04c-b98feea02fd6",
+        "chatSessionId": "sess_d34467a0-8748-4e29-ab8d-6e9441f68743",
+        "timestamp": 1788156071546
+      },
+      {
+        "executionId": "1450e719-d413-42ca-b04c-b98feea02fd6",
+        "chatSessionId": "sess_d34467a0-8748-4e29-ab8d-6e9441f68743",
+        "timestamp": 1788156975558
+      }
+    ],
+    "14. Implement classroom mode and educational features": [
+      {
+        "executionId": "1450e719-d413-42ca-b04c-b98feea02fd6",
+        "chatSessionId": "sess_d34467a0-8748-4e29-ab8d-6e9441f68743",
+        "timestamp": 1788156975601
+      }
+    ],
+    "9.5 Write unit test: verify categories not in enabled set produce no dispatch; verify confidence < 0.50 produces no dispatch; verify emergency event triggers full-screen alert within 500 ms; verify `SoundClassifier` emits no event on classification exception": [
+      {
+        "executionId": "34e01f99-fe60-47fb-b80e-ae46d7766b94",
+        "chatSessionId": "sess_c081491c-99c5-460a-b9d4-7445ce0cc487",
+        "timestamp": 1788157008251
+      },
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788768184144
+      },
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788769397960
+      }
+    ],
+    "9.6 Write property tests for classification and dispatch (Properties 11, 12, 13, 14, 15)": [
+      {
+        "executionId": "34e01f99-fe60-47fb-b80e-ae46d7766b94",
+        "chatSessionId": "sess_c081491c-99c5-460a-b9d4-7445ce0cc487",
+        "timestamp": 1788157013012
+      },
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788768188154
+      },
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788769402320
+      }
+    ],
+    "10.1 Implement `AnalyticsEngineImpl`: subscribe to SPL measurements from `AudioEngine`; compute NIOSH dose (dose% = 100 × Σ(Cᵢ / Tᵢ), Tᵢ = 8h × 2^((85−Lᵢ)/3)); emit `dailyDosePercent` state flow; emit moderate warning at 50%, high warning at 100%; persist `DailyExposureEntity` records; purge records older than 90 days": [
+      {
+        "executionId": "34e01f99-fe60-47fb-b80e-ae46d7766b94",
+        "chatSessionId": "sess_c081491c-99c5-460a-b9d4-7445ce0cc487",
+        "timestamp": 1788157016894
+      },
+      {
+        "executionId": "3c0fb969-17d7-406c-9822-3f55c0ab5d7c",
+        "chatSessionId": "sess_8cedeb8e-4cdf-412a-9102-876be907bd3b",
+        "timestamp": 1788159646430
+      }
+    ],
+    "10.2 Implement `generateTrendReport(days = 30)`: query last 30 `DailyExposureEntity` records; compute average daily dose, count of high-risk days, and max peak SPL across window": [
+      {
+        "executionId": "34e01f99-fe60-47fb-b80e-ae46d7766b94",
+        "chatSessionId": "sess_c081491c-99c5-460a-b9d4-7445ce0cc487",
+        "timestamp": 1788157020593
+      },
+      {
+        "executionId": "3c0fb969-17d7-406c-9822-3f55c0ab5d7c",
+        "chatSessionId": "sess_8cedeb8e-4cdf-412a-9102-876be907bd3b",
+        "timestamp": 1788159650919
+      }
+    ],
+    "10.4 Write unit test: verify dose formula for known SPL/duration pairs; verify moderate warning emitted at 50% and high at 100%; verify trend report includes correct fields": [
+      {
+        "executionId": "3c0fb969-17d7-406c-9822-3f55c0ab5d7c",
+        "chatSessionId": "sess_8cedeb8e-4cdf-412a-9102-876be907bd3b",
+        "timestamp": 1788159656403
+      }
+    ],
+    "10.5 Write property tests for AnalyticsEngine (Properties 16, 17, 18, 19, 20)": [
+      {
+        "executionId": "3c0fb969-17d7-406c-9822-3f55c0ab5d7c",
+        "chatSessionId": "sess_8cedeb8e-4cdf-412a-9102-876be907bd3b",
+        "timestamp": 1788159659872
+      },
+      {
+        "executionId": "cd7550fa-adef-4f73-a70d-830910735632",
+        "chatSessionId": "sess_513a8e5e-5489-40cc-b4aa-dbb1d3c680cd",
+        "timestamp": 1791353363001
+      },
+      {
+        "executionId": "cd7550fa-adef-4f73-a70d-830910735632",
+        "chatSessionId": "sess_513a8e5e-5489-40cc-b4aa-dbb1d3c680cd",
+        "timestamp": 1791354026315
+      }
+    ],
+    "8.5 Write property tests for CaptionEngine (Properties 7, 8, 9, 10)": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766226626
+      },
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766237962
+      },
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788768170356
+      }
+    ],
+    "9.3 Implement `NotificationDispatcherImpl`: map `SoundDetection` to `AlertPriority` (HIGH ≥ 0.80, LOW 0.50–0.79, ignore < 0.50); dispatch to enabled `AlertChannel`s (screen banner via `NotificationManager`, vibration via `Vibrator`, flashlight via `CameraManager`, smartwatch via `WearableBridge`); apply configured `FlashlightPattern`": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766227086
+      },
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766242004
+      },
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788768175724
+      }
+    ],
+    "11. Checkpoint — AI processing and analytics complete": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766227176
+      }
+    ],
+    "15.1 Implement `WearableBridgeImpl`: scan and connect to A2DP/HFP devices via `BluetoothAdapter`; connect to BLE devices via `BluetoothLeScanner`; read battery level via GATT `0x2A19` characteristic (set `batteryPercent = null` on read failure); start 30-s reconnect loop on unexpected disconnection; notify user after timeout": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766227278
+      },
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788769411458
+      },
+      {
+        "executionId": "662c60ec-bb28-4bc2-b498-df4ed3fe1331",
+        "chatSessionId": "sess_30715d62-be53-47e9-8987-754b53aaa514",
+        "timestamp": 1792945545501
+      }
+    ],
+    "15.2 Wire `AudioEngine` to route output to connected A2DP device automatically; wire `NotificationDispatcher.sendAlert` to `WearableBridge.sendAlert` for smartwatch vibration": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766227335
+      },
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788769415781
+      }
+    ],
+    "15.3 Implement `sendCaptions` to transmit `CaptionSegment.text` to display-capable wearables (`supportsDisplay == true`) only; subscribe to `CaptionViewModel.captions` flow in `AudioProcessingService`": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766227417
+      },
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788769420086
+      }
+    ],
+    "15.4 Write unit test: verify `batteryPercent` is non-null and in [0, 100] when GATT characteristic present; verify null when absent; verify no caption transmitted to non-display device; verify alert forwarded to smartwatch": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766227472
+      }
+    ],
+    "15.5 Write property tests for WearableBridge (Properties 26, 27)": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766227536
+      }
+    ],
+    "16.1 Implement SOS function in `AlertViewModel`: on user activation, retrieve GPS via `FusedLocationProviderClient`; if unavailable, use last-known location with staleness timestamp; compose and send SMS to up to 5 saved contacts via `SmsManager`; retry 3 times on failure; show error if contacts not configured": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766227654
+      }
+    ],
+    "16.2 Implement environmental awareness mode in `AlertViewModel`: subscribe to `SoundClassifier.detections`; for each detection call `aiAssistant.describeSound`; maintain a `description queue` (max depth 5, dequeue oldest when full); merge same-category events within 3 s into one card; auto-dismiss cards after 5 s; if TTS enabled, read description via `TextToSpeech`": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766227726
+      }
+    ],
+    "16.3 Wire `EmergencyDetector.emergencyEvents` to trigger full-screen `EmergencyAlertDialog` composable within 500 ms; wire to `WearableBridge.sendAlert` for smartwatch emergency regardless of screen state; ensure detector stays active when screen is off by holding `WakeLock` in `AudioProcessingService`": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766227802
+      }
+    ],
+    "16.4 Write unit test: verify SOS sends last-known location with staleness note when GPS unavailable; verify no SOS sent when contacts list empty; verify description queue never exceeds 5; verify same-category events within 3 s merged into one card": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766227865
+      }
+    ],
+    "16.5 Write property tests for spatial narration queue (Properties 28, 29, 30)": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766227919
+      }
+    ],
+    "17. Checkpoint — all backend components wired and tested": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228002
+      }
+    ],
+    "18.1 Build `AmplifierScreen`: gain slider (0–40 dB), adaptive amplification toggle, environment preset selector, directional hearing control (direction picker, disabled state for single-mic), loudness warning banner; bind to `AudioViewModel`": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228071
+      }
+    ],
+    "18.2 Build `CaptionsScreen`: scrollable caption list (each segment shows speaker label, text, uncertainty indicator), language selector dropdown, start/stop button, export button with share sheet, classroom mode FAB; bind to `CaptionViewModel`": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228162
+      }
+    ],
+    "18.3 Build `AlertsScreen`: sound category toggle list (enable/disable each of 20+ categories), alert channel checkboxes, flashlight pattern selector, recent detections feed, emergency alert full-screen overlay; bind to `AlertViewModel`": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228217
+      }
+    ],
+    "18.4 Build `AnalyticsScreen`: current SPL gauge, daily dose progress bar with color-coded risk level, 7-day trend `LineChart` (using Compose Canvas or Vico), peak level indicator, \"Generate Report\" button; bind to `AnalyticsViewModel`": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228283
+      }
+    ],
+    "18.5 Build `ProfilesScreen`: profile list with activate/delete actions, \"New Profile\" dialog, hearing test flow (tone playback UI with \"I can hear it\" button per frequency), audiologist recommendation card; bind to `ProfileViewModel`": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228337
+      }
+    ],
+    "18.6 Build `SettingsScreen`: privacy settings (data retention info, \"Delete All Data\" button), cloud AI opt-in toggle, TTS toggle, Bluetooth device list with battery indicators; bind to `PermissionsViewModel` and `PreferencesRepository`": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228421
+      }
+    ],
+    "18.7 Update `MainActivity` navigation to include all 6 screens (Amplifier, Captions, Alerts, Analytics, Profiles, Settings) with bottom nav bar; add top-level permission gate that shows `PermissionRationaleScreen` on first launch": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228504
+      }
+    ],
+    "19.1 Implement `deleteAllData()` in `DataRepository`: run in a single Room transaction deleting all rows from `CaptionSegmentEntity`, `TranscriptSession`, `EqBandEntity`, `AudiogramEntity`, `HearingProfile`, `DailyExposureEntity`, `VocabTermEntity`; then clear all DataStore preferences; complete within 5 s; emit a confirmation event to `SettingsViewModel`": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228567
+      }
+    ],
+    "19.2 Implement runtime permission revocation handling in `PermissionsViewModel`: observe permission state changes via `AppOpsManager` or broadcast receiver; when a permission is revoked, pause dependent features and emit `PermissionRevokedEvent` with affected feature list; display impact message in UI": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228632
+      }
+    ],
+    "19.3 Write unit test: verify all Room tables empty and DataStore cleared after `deleteAllData()`; verify features disabled and message shown on permission revocation": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228701
+      }
+    ],
+    "19.4 Write property tests for privacy (Properties 31, 32)": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228768
+      }
+    ],
+    "20. Wire Hilt dependency injection across all components": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228854
+      }
+    ],
+    "21. Final checkpoint — full integration": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788766228904
+      }
+    ],
+    "8. Implement CaptionEngine and TranscriptStore": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788768170412
+      }
+    ],
+    "9. Implement SoundClassifier, EmergencyDetector, and NotificationDispatcher": [
+      {
+        "executionId": "f626272b-ab48-43da-94b1-30601331ecee",
+        "chatSessionId": "sess_96c2d6b0-0e92-4ccb-bf9e-a9cd2b2c3d5b",
+        "timestamp": 1788769402409
+      }
+    ]
+  }
+}

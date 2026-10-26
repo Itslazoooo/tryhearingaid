@@ -1,0 +1,75 @@
+﻿> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:checkDebugAarMetadata
+> Task :app:processDebugNavigationResources
+> Task :app:generateDebugResValues
+> Task :app:compileDebugNavigationResources
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+
+> Task :app:processDebugMainManifest
+[org.tensorflow:tensorflow-lite:2.13.0] C:\Users\PC\.gradle\caches\8.13\transforms\cb8752f183ac0bda97990d40ce60644c\transformed\tensorflow-lite-2.13.0\AndroidManifest.xml Warning:
+	Namespace 'org.tensorflow.lite' is used in multiple modules and/or libraries: org.tensorflow:tensorflow-lite:2.13.0, org.tensorflow:tensorflow-lite-api:2.13.0. Please ensure that all modules and libraries have a unique namespace. For more information, See https://developer.android.com/studio/build/configure-app-module#set-namespace
+[org.tensorflow:tensorflow-lite-support:0.4.4] C:\Users\PC\.gradle\caches\8.13\transforms\6fe2a26e5bf2663174f55f79b435050b\transformed\tensorflow-lite-support-0.4.4\AndroidManifest.xml Warning:
+	Namespace 'org.tensorflow.lite.support' is used in multiple modules and/or libraries: org.tensorflow:tensorflow-lite-support:0.4.4, org.tensorflow:tensorflow-lite-support-api:0.4.4. Please ensure that all modules and libraries have a unique namespace. For more information, See https://developer.android.com/studio/build/configure-app-module#set-namespace
+
+> Task :app:processDebugManifest
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebug
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:processDebugResources
+> Task :app:kspDebugKotlin
+
+> Task :app:compileDebugKotlin
+w: file:///D:/tryhearingaid/app/src/main/java/com/example/tryhearingaid/MainActivity.kt:110:72 'val Icons.Filled.Message: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Message.
+w: file:///D:/tryhearingaid/app/src/main/java/com/example/tryhearingaid/ui/AlertsScreen.kt:115:9 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/tryhearingaid/app/src/main/java/com/example/tryhearingaid/ui/AlertsScreen.kt:131:9 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/tryhearingaid/app/src/main/java/com/example/tryhearingaid/ui/AlertsScreen.kt:145:9 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/tryhearingaid/app/src/main/java/com/example/tryhearingaid/ui/AlertsScreen.kt:185:21 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/tryhearingaid/app/src/main/java/com/example/tryhearingaid/ui/AlertsScreen.kt:251:21 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/tryhearingaid/app/src/main/java/com/example/tryhearingaid/ui/AlertsScreen.kt:315:21 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/tryhearingaid/app/src/main/java/com/example/tryhearingaid/ui/AmplifierScreen.kt:318:26 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+w: file:///D:/tryhearingaid/app/src/main/java/com/example/tryhearingaid/ui/CaptionsScreen.kt:196:18 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:hiltAggregateDepsDebug
+> Task :app:hiltJavaCompileDebug
+> Task :app:processDebugJavaRes
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:transformDebugClassesWithAsm
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:kspDebugUnitTestKotlin
+
+> Task :app:compileDebugUnitTestKotlin
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/ai/VocabularyPropertyTest.kt:36:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/ai/VocabularyPropertyTest.kt:93:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/audio/AudioEngineGainPropertyTest.kt:35:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/audio/EqualizerPropertyTest.kt:85:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/audio/EqualizerPropertyTest.kt:116:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/audio/EqualizerPropertyTest.kt:187:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/audio/EqualizerPropertyTest.kt:245:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/audio/NoiseReducerPropertyTest.kt:39:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/audio/NoiseReducerPropertyTest.kt:50:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/captions/CaptionEnginePropertyTest.kt:56:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/captions/CaptionEnginePropertyTest.kt:129:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/captions/CaptionEnginePropertyTest.kt:192:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/profiles/HearingTestPropertyTest.kt:82:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/profiles/HearingTestPropertyTest.kt:122:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+w: file:///D:/tryhearingaid/app/src/test/java/com/example/tryhearingaid/profiles/HearingTestPropertyTest.kt:169:13 This declaration needs opt-in. Its usage should be marked with '@io.kotest.common.ExperimentalKotest' or '@OptIn(io.kotest.common.ExperimentalKotest::class)'
+
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:hiltAggregateDepsDebugUnitTest
+> Task :app:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:transformDebugUnitTestClassesWithAsm
+> Task :app:testDebugUnitTest
+
+BUILD SUCCESSFUL in 1m 28s
+32 actionable tasks: 32 executed
