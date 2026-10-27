@@ -1,5 +1,6 @@
 package com.example.tryhearingaid.service
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -26,6 +28,8 @@ import com.example.tryhearingaid.audio.NoiseReducerImpl
 import com.example.tryhearingaid.audio.VoiceIsolatorImpl
 import com.example.tryhearingaid.captions.CaptionEngine
 import com.example.tryhearingaid.classification.EmergencyDetectorImpl
+import com.example.tryhearingaid.data.AlertPriority
+import com.example.tryhearingaid.data.SoundAlert
 import com.example.tryhearingaid.classification.SoundClassifierImpl
 import com.example.tryhearingaid.wearable.CaptionForwarder
 import com.example.tryhearingaid.wearable.WearableBridgeImpl
@@ -116,6 +120,13 @@ class AudioProcessingService : Service() {
      * Requirement 10.5.
      */
     private lateinit var emergencyDetector: EmergencyDetectorImpl
+
+    /**
+     * Partial wake lock held for the whole service lifetime so the CPU keeps running, and the
+     * emergency detector keeps listening, while the screen is off (Requirement 10.5).
+     * It is the main battery cost of the service; it is released in [onDestroy].
+     */
+    private var wakeLock: PowerManager.WakeLock? = null
 
     /**
      * [WearableBridgeImpl] that manages Bluetooth (A2DP/HFP) and BLE wearable
@@ -230,8 +241,26 @@ class AudioProcessingService : Service() {
         emergencyDetector = EmergencyDetectorImpl(soundClassifier)
         emergencyDetector.start()
         Log.d(TAG, "EmergencyDetector started — always-on subscription active.")
+        acquireWakeLock()
 
         startWearableIntegration()
+    }
+
+    /** Take the partial wake lock. Does nothing if the device has no [PowerManager]. */
+    @SuppressLint("WakelockTimeout") // Held on purpose until onDestroy; see [wakeLock].
+    private fun acquireWakeLock() {
+        val powerManager = getSystemService(PowerManager::class.java) ?: return
+        wakeLock = powerManager
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "tryhearingaid:emergency-detector")
+            .apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let { if (it.isHeld) it.release() }
+        wakeLock = null
     }
 
     /**
@@ -260,6 +289,26 @@ class AudioProcessingService : Service() {
                         audioEngine.routeOutput(route)
                     }
                 }
+        }
+
+        // Emergency sounds always go to a connected smartwatch, whatever the phone screen is
+        // doing (Requirement 10.6).
+        serviceScope.launch {
+            emergencyDetector.emergencyEvents.collect { event ->
+                try {
+                    wearableBridge.sendAlert(
+                        SoundAlert(
+                            category = event.category,
+                            confidence = event.confidence,
+                            priority = AlertPriority.HIGH,
+                            description = null,
+                            detectedAtMs = event.detectedAtMs
+                        )
+                    )
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not forward emergency to wearable: ${e.message}")
+                }
+            }
         }
 
         val captionForwarder = CaptionForwarder()
@@ -319,6 +368,7 @@ class AudioProcessingService : Service() {
         // Stop following wearable state. The bridge itself is an app-wide singleton
         // shared with the dispatcher, so it is not released here.
         serviceScope.cancel()
+        releaseWakeLock()
         super.onDestroy()
     }
 

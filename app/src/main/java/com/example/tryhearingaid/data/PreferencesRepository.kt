@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.tryhearingaid.emergency.SosContacts
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -39,6 +40,8 @@ data class UserPreferences(
     val cloudAiEnabled: Boolean = false,
     val ttsEnabled: Boolean = false,
     val privacyAudioUploadConsent: Boolean = false,
+    /** Emergency SOS phone numbers, at most [SosContacts.MAX_CONTACTS], in the order the user entered them. */
+    val sosContacts: List<String> = emptyList(),
 )
 
 // ---------------------------------------------------------------------------
@@ -75,6 +78,10 @@ interface PreferencesRepository {
     suspend fun updateTtsEnabled(enabled: Boolean)
     suspend fun updatePrivacyAudioUploadConsent(consent: Boolean)
 
+    // -- Emergency SOS --
+    /** Saves the SOS contacts after cleaning them with [SosContacts.normalize]. */
+    suspend fun updateSosContacts(numbers: List<String>)
+
     /** Resets every preference back to its default value. */
     suspend fun clearAll()
 }
@@ -108,6 +115,7 @@ class DataStorePreferencesRepository(
         val CLOUD_AI_ENABLED = booleanPreferencesKey("cloud_ai_enabled")
         val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
         val PRIVACY_AUDIO_UPLOAD_CONSENT = booleanPreferencesKey("privacy_audio_upload_consent")
+        val SOS_CONTACTS = stringPreferencesKey("sos_contacts")
     }
 
     // -- Default sets (computed once) ----------------------------------------
@@ -132,6 +140,7 @@ class DataStorePreferencesRepository(
             cloudAiEnabled = prefs[Keys.CLOUD_AI_ENABLED] ?: false,
             ttsEnabled = prefs[Keys.TTS_ENABLED] ?: false,
             privacyAudioUploadConsent = prefs[Keys.PRIVACY_AUDIO_UPLOAD_CONSENT] ?: false,
+            sosContacts = SosContacts.decode(prefs[Keys.SOS_CONTACTS]),
         )
     }
 
@@ -174,6 +183,10 @@ class DataStorePreferencesRepository(
 
     override suspend fun updatePrivacyAudioUploadConsent(consent: Boolean) {
         dataStore.edit { it[Keys.PRIVACY_AUDIO_UPLOAD_CONSENT] = consent }
+    }
+
+    override suspend fun updateSosContacts(numbers: List<String>) {
+        dataStore.edit { it[Keys.SOS_CONTACTS] = SosContacts.encode(numbers) }
     }
 
     override suspend fun clearAll() {
@@ -228,6 +241,10 @@ class InMemoryPreferencesRepository : PreferencesRepository {
 
     override suspend fun updatePrivacyAudioUploadConsent(consent: Boolean) {
         _state.value = _state.value.copy(privacyAudioUploadConsent = consent)
+    }
+
+    override suspend fun updateSosContacts(numbers: List<String>) {
+        _state.value = _state.value.copy(sosContacts = SosContacts.normalize(numbers))
     }
 
     override suspend fun clearAll() {

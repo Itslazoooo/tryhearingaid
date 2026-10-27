@@ -7,10 +7,42 @@ import com.example.tryhearingaid.data.EmergencyEvent
 import com.example.tryhearingaid.data.FlashlightPattern
 import com.example.tryhearingaid.data.SoundCategory
 import com.example.tryhearingaid.data.SoundDetection
+import com.example.tryhearingaid.emergency.SosController
+import com.example.tryhearingaid.emergency.SosResult
+import com.example.tryhearingaid.environmental.DescriptionCard
+import com.example.tryhearingaid.environmental.NarrationController
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+// ─── SOS status ───────────────────────────────────────────────────────────────
+
+/** Progress and outcome of the emergency SOS, shown on the Alerts screen (Requirement 10.3, 10.4). */
+sealed class SosStatus {
+    /** Nothing has been triggered, or the last result was dismissed. */
+    object Idle : SosStatus()
+
+    /** Messages are being sent. */
+    object Sending : SosStatus()
+
+    /** No emergency contacts are saved, so nothing was sent. */
+    object NoContacts : SosStatus()
+
+    /** Every contact received the message. */
+    data class Sent(val count: Int) : SosStatus()
+
+    /** Some contacts received it and some did not, after retries. [failed] holds the numbers that did not. */
+    data class PartlyFailed(val sent: Int, val failed: List<String>) : SosStatus()
+
+    /** No contact received it. The screen should offer to dial one of [failed] by hand. */
+    data class AllFailed(val failed: List<String>) : SosStatus()
+
+    /** SOS could not run, for example because it is not set up or the permission is missing. */
+    data class Error(val message: String) : SosStatus()
+}
 
 // ─── UI state ─────────────────────────────────────────────────────────────────
 
@@ -30,7 +62,10 @@ data class AlertUiState(
     val alertChannels: Set<AlertChannel> = setOf(AlertChannel.SCREEN_BANNER, AlertChannel.VIBRATION),
     val flashlightPattern: FlashlightPattern = FlashlightPattern.SHORT,
     val recentDetections: List<SoundDetection> = emptyList(),
-    val emergencyEvent: EmergencyEvent? = null
+    val emergencyEvent: EmergencyEvent? = null,
+    val sosStatus: SosStatus = SosStatus.Idle,
+    val awarenessEnabled: Boolean = false,
+    val descriptionCards: List<DescriptionCard> = emptyList()
 )
 
 // ─── Intents ──────────────────────────────────────────────────────────────────
@@ -54,6 +89,15 @@ sealed class AlertIntent {
 
     /** An emergency event was triggered (internal use). */
     data class OnEmergency(val event: EmergencyEvent) : AlertIntent()
+
+    /** User pressed the SOS button. Ignored while a previous SOS is still sending. */
+    object TriggerSos : AlertIntent()
+
+    /** User closed the SOS result message. */
+    object DismissSosStatus : AlertIntent()
+
+    /** Turn environmental awareness (spoken-style sound descriptions) on or off (Requirement 15). */
+    data class SetAwareness(val enabled: Boolean) : AlertIntent()
 }
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
@@ -65,9 +109,16 @@ sealed class AlertIntent {
  * - Handles [AlertIntent]s dispatched from the UI or from internal detection
  *   events forwarded by the [AudioProcessingService] / [DataRepository].
  *
- * Satisfies Requirements 9.3, 9.4, 9.5.
+ * Satisfies Requirements 9.3, 9.4, 9.5, 10.3, 10.4, 15.1 to 15.5.
+ *
+ * Both controllers are optional so the screen can be previewed and tested without Android
+ * services. Without [sosController] the SOS button reports an error; without
+ * [narrationController] awareness mode shows no cards.
  */
-class AlertViewModel : ViewModel() {
+class AlertViewModel(
+    private val sosController: SosController? = null,
+    private val narrationController: NarrationController? = null
+) : ViewModel() {
 
     companion object {
         /** Maximum number of recent detections shown in the feed. */
@@ -76,6 +127,23 @@ class AlertViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(AlertUiState())
     val uiState: StateFlow<AlertUiState> = _uiState.asStateFlow()
+
+    init {
+        // Mirror the narration cards into the UI state. Only touches viewModelScope when a
+        // controller was supplied, so plain `AlertViewModel()` keeps working in JVM tests.
+        narrationController?.let { controller ->
+            viewModelScope.launch {
+                controller.cards.collect { cards ->
+                    _uiState.update { it.copy(descriptionCards = cards) }
+                }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        narrationController?.stop()
+        super.onCleared()
+    }
 
     // ── Intent handling ───────────────────────────────────────────────────────
 
@@ -114,6 +182,47 @@ class AlertViewModel : ViewModel() {
             is AlertIntent.OnEmergency -> {
                 _uiState.value = _uiState.value.copy(emergencyEvent = intent.event)
             }
+
+            is AlertIntent.TriggerSos -> triggerSos()
+
+            is AlertIntent.DismissSosStatus -> {
+                // Do not hide the status while messages are still going out.
+                if (_uiState.value.sosStatus !is SosStatus.Sending) {
+                    _uiState.update { it.copy(sosStatus = SosStatus.Idle) }
+                }
+            }
+
+            is AlertIntent.SetAwareness -> {
+                if (intent.enabled) narrationController?.start() else narrationController?.stop()
+                _uiState.update { it.copy(awarenessEnabled = intent.enabled) }
+            }
+        }
+    }
+
+    private fun triggerSos() {
+        if (_uiState.value.sosStatus is SosStatus.Sending) return
+        val controller = sosController
+        if (controller == null) {
+            _uiState.update { it.copy(sosStatus = SosStatus.Error("SOS is not available yet.")) }
+            return
+        }
+        _uiState.update { it.copy(sosStatus = SosStatus.Sending) }
+        viewModelScope.launch {
+            val status = try {
+                when (val result = controller.trigger()) {
+                    SosResult.NoContacts -> SosStatus.NoContacts
+                    is SosResult.Completed -> when {
+                        result.failed.isEmpty() -> SosStatus.Sent(result.sentTo.size)
+                        result.allFailed -> SosStatus.AllFailed(result.failed)
+                        else -> SosStatus.PartlyFailed(result.sentTo.size, result.failed)
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                SosStatus.Error(e.message ?: "SOS failed.")
+            }
+            _uiState.update { it.copy(sosStatus = status) }
         }
     }
 

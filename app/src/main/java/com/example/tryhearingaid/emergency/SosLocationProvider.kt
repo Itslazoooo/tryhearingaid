@@ -23,7 +23,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Typical use: try [current]; if it returns `null`, fall back to [lastKnown]. Pass both to
  * [SosMessageBuilder.build], which adds the "may be outdated" note for an old fix.
  */
-class SosLocationProvider(private val context: Context) {
+class SosLocationProvider(private val context: Context) : SosLocationSource {
 
     private val manager: LocationManager? = context.getSystemService(LocationManager::class.java)
 
@@ -33,7 +33,7 @@ class SosLocationProvider(private val context: Context) {
 
     /** The newest position any enabled provider has stored, or `null` if there is none. */
     @SuppressLint("MissingPermission")
-    fun lastKnown(): SosLocation? {
+    override fun lastKnown(): SosLocation? {
         val m = manager ?: return null
         if (!hasPermission()) return null
         return try {
@@ -46,13 +46,16 @@ class SosLocationProvider(private val context: Context) {
         }
     }
 
+    /** A fresh fix within [DEFAULT_TIMEOUT_MS], or `null`. See [currentWithin]. */
+    override suspend fun current(): SosLocation? = currentWithin(DEFAULT_TIMEOUT_MS)
+
     /**
      * Request a fresh fix and wait up to [timeoutMs] for it. Prefers GPS and falls back to
      * the network provider. Returns `null` on timeout, when no provider is enabled, or
      * when the permission is missing.
      */
     @SuppressLint("MissingPermission")
-    suspend fun current(timeoutMs: Long = DEFAULT_TIMEOUT_MS): SosLocation? {
+    suspend fun currentWithin(timeoutMs: Long): SosLocation? {
         val m = manager ?: return null
         if (!hasPermission()) return null
         val provider = when {
