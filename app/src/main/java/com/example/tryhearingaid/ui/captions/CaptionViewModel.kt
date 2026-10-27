@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.tryhearingaid.ai.AIAssistant
 import com.example.tryhearingaid.captions.CaptionEngine
 import com.example.tryhearingaid.captions.TranscriptStore
+import com.example.tryhearingaid.data.LocalUserFilesImpl
 import com.example.tryhearingaid.data.CaptionSegment
 import com.example.tryhearingaid.data.StudyNotes
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -351,7 +352,7 @@ class CaptionViewModel @Inject constructor(
      */
     private fun startAudioRecording(): String? {
         return try {
-            val audioDir = File(appContext.filesDir, "classroom_audio").apply { mkdirs() }
+            val audioDir = File(appContext.filesDir, LocalUserFilesImpl.CLASSROOM_AUDIO_DIR).apply { mkdirs() }
             val outputFile = File(audioDir, "session_${sessionId}_${Instant.now().epochSecond}.m4a")
 
             val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

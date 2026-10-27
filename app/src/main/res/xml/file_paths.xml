@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Transcript exports are written to the app's cache folder (see TranscriptStoreImpl). -->
+<paths>
+    <cache-path name="transcripts" path="." />
+</paths>

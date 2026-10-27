@@ -86,11 +86,11 @@ fun CaptionsScreen(
         val file = uiState.exportedFile ?: return@LaunchedEffect
         val uri = FileProvider.getUriForFile(
             context,
-            "${context.packageName}.provider",
+            "${context.packageName}.fileprovider", // must match the <provider> in AndroidManifest.xml
             file
         )
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
+            type = if (file.extension.equals("pdf", ignoreCase = true)) "application/pdf" else "text/plain"
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }

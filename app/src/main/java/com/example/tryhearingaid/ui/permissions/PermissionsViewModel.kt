@@ -40,6 +40,23 @@ data class PermissionsUiState(
 
     /** Bluetooth hearing-aid / earbud routing requires BLUETOOTH_CONNECT. */
     val isBluetoothFeatureEnabled: Boolean get() = isBluetoothConnectGranted
+
+    /** Whether [permission] is currently granted. Unknown permissions count as not granted. */
+    fun isGranted(permission: String): Boolean = when (permission) {
+        Manifest.permission.RECORD_AUDIO -> isRecordAudioGranted
+        Manifest.permission.ACCESS_FINE_LOCATION -> isLocationGranted
+        Manifest.permission.CAMERA -> isCameraGranted
+        Manifest.permission.BLUETOOTH_CONNECT -> isBluetoothConnectGranted
+        Manifest.permission.POST_NOTIFICATIONS -> isPostNotificationsGranted
+        else -> false
+    }
+
+    /**
+     * Names of every feature that can be used right now: a feature is enabled only while the
+     * permission it depends on is granted (Requirement 16.3, Property 31).
+     */
+    val enabledFeatures: Set<String>
+        get() = permissionFeatureMap.filterKeys { isGranted(it) }.values.flatten().toSet()
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────────
@@ -58,7 +75,8 @@ sealed class PermissionUiEvent {
 
 // ─── Feature dependency map ───────────────────────────────────────────────────
 
-private val permissionFeatureMap: Map<String, List<String>> = mapOf(
+/** Which features stop working when each permission is missing. Each feature depends on one permission. */
+internal val permissionFeatureMap: Map<String, List<String>> = mapOf(
     Manifest.permission.RECORD_AUDIO to
             listOf("Audio Amplification", "Live Captions", "Sound Alerts", "Analytics"),
     Manifest.permission.ACCESS_FINE_LOCATION to
@@ -116,18 +134,22 @@ class PermissionsViewModel @Inject constructor() : ViewModel() {
         }
     }
 
+    /**
+     * Re-read all five permissions from the system and apply any change, so a permission the
+     * user switched off in system settings is noticed. Call it each time the app returns to the
+     * foreground, passing for example
+     * `{ ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }`.
+     * Revoked permissions emit [PermissionUiEvent.PermissionRevoked] as usual.
+     */
+    fun refresh(isGranted: (String) -> Boolean) {
+        permissionFeatureMap.keys.forEach { onPermissionResult(it, isGranted(it)) }
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /** Read the current grant state for a specific [permission]. */
     private fun getGrantedState(state: PermissionsUiState, permission: String): Boolean =
-        when (permission) {
-            Manifest.permission.RECORD_AUDIO -> state.isRecordAudioGranted
-            Manifest.permission.ACCESS_FINE_LOCATION -> state.isLocationGranted
-            Manifest.permission.CAMERA -> state.isCameraGranted
-            Manifest.permission.BLUETOOTH_CONNECT -> state.isBluetoothConnectGranted
-            Manifest.permission.POST_NOTIFICATIONS -> state.isPostNotificationsGranted
-            else -> false
-        }
+        state.isGranted(permission)
 
     /** Return a copy of [PermissionsUiState] with [permission] set to [granted]. */
     private fun PermissionsUiState.withPermission(permission: String, granted: Boolean): PermissionsUiState =

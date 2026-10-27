@@ -1,5 +1,6 @@
 package com.example.tryhearingaid.data
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import java.util.UUID
@@ -132,10 +133,17 @@ interface DataRepository {
  *
  * @param db                    The Room database singleton.
  * @param preferencesRepository The DataStore-backed preferences repository.
+ * @param localFiles            Recordings and exports stored as plain files; removed by [deleteAllData].
+ * @param inTransaction         Runs a block as one database transaction. Defaults to Room's
+ *                              `withTransaction`; tests pass a plain runner.
  */
 class DataRepositoryImpl(
     private val db: HearingAidDatabase,
     private val preferencesRepository: PreferencesRepository,
+    private val localFiles: LocalUserFiles = LocalUserFiles.None,
+    private val inTransaction: suspend (suspend () -> Unit) -> Unit = { block ->
+        db.withTransaction { block() }
+    },
 ) : DataRepository {
 
     // ── Preferences ───────────────────────────────────────────────────────────
@@ -156,17 +164,33 @@ class DataRepositoryImpl(
 
     // ── Global data wipe ──────────────────────────────────────────────────────
 
+    /**
+     * Erase everything the app has stored about the user (Requirement 16.5).
+     *
+     * 1. All database tables are emptied in ONE transaction, so a failure leaves the database
+     *    exactly as it was instead of half-deleted. If it fails, nothing else is touched.
+     * 2. Recordings and exported transcripts are deleted.
+     * 3. Preferences are cleared, which also removes the SOS contacts.
+     *
+     * Throws if a file could not be deleted, after clearing the preferences, so the caller never
+     * tells the user that everything was erased when something is still on the device.
+     */
     override suspend fun deleteAllData() {
-        // Profiles (cascades to eq_band and audiogram via FK ON DELETE CASCADE)
-        db.profileDao().deleteAllProfiles()
-        // Transcripts and their caption segments (CASCADE handles segments)
-        db.transcriptDao().deleteAllSessions()
-        // Analytics
-        db.analyticsDao().deleteAll()
-        // Vocabulary
-        db.vocabularyDao().clearAll()
+        inTransaction {
+            // Profiles (cascades to eq_band and audiogram via FK ON DELETE CASCADE)
+            db.profileDao().deleteAllProfiles()
+            // Segments first, then sessions (the foreign key would cascade anyway; this is explicit)
+            db.transcriptDao().deleteAllSegments()
+            db.transcriptDao().deleteAllSessions()
+            // Analytics
+            db.analyticsDao().deleteAll()
+            // Vocabulary
+            db.vocabularyDao().clearAll()
+        }
+        val filesGone = localFiles.deleteAll()
         // DataStore preferences
         preferencesRepository.clearAll()
+        check(filesGone) { "Some recordings or exports could not be deleted from this device." }
     }
 
     // ── Sessions ──────────────────────────────────────────────────────────────
