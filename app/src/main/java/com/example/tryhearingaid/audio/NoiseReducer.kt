@@ -32,4 +32,10 @@ interface NoiseReducer : AudioProcessingStage {
 
     /** Return the currently active [EnvironmentPreset]. */
     fun getActivePreset(): EnvironmentPreset
+
+    /**
+     * How strongly noise is reduced, from 0 (off, audio passes through untouched) to 1 (strongest).
+     * 0.5 applies the active preset exactly as designed. Ignored by implementations without it.
+     */
+    fun setStrength(strength: Float) {}
 }

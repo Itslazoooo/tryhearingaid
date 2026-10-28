@@ -39,6 +39,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.tryhearingaid.audio.AudioDirection
+import com.example.tryhearingaid.data.AudioSettings
 import com.example.tryhearingaid.data.EnvironmentPreset
 import com.example.tryhearingaid.ui.audio.AudioIntent
 import com.example.tryhearingaid.ui.audio.AudioUiState
@@ -87,9 +88,12 @@ fun AmplifierContent(
         // ── Loudness warning banner ───────────────────────────────────────────
         LoudnessWarningBanner(visible = uiState.loudnessWarning)
 
+        // ── Headphones required ───────────────────────────────────────────────
+        HeadphonesBanner(uiState = uiState)
+
         // ── Start / Stop control ─────────────────────────────────────────────
         StartStopRow(
-            isRunning = uiState.isRunning,
+            isRunning = uiState.amplifierWanted,
             onStart = { onIntent(AudioIntent.Start) },
             onStop = { onIntent(AudioIntent.Stop) }
         )
@@ -112,6 +116,9 @@ fun AmplifierContent(
             onSelect = { onIntent(AudioIntent.SetNoisePreset(it)) }
         )
 
+        // ── Sound quality: sample rate, noise reduction, voice focus ──────────
+        SoundQualityCard(uiState = uiState, onIntent = onIntent)
+
         // ── Directional hearing control ───────────────────────────────────────
         DirectionalHearingCard(
             available = uiState.isDirectionalAvailable,
@@ -120,6 +127,101 @@ fun AmplifierContent(
         )
     }
 }
+
+// ─── Headphones banner ────────────────────────────────────────────────────────
+
+@Composable
+private fun HeadphonesBanner(uiState: AudioUiState) {
+    val (text, error) = when {
+        !uiState.headphonesConnected ->
+            "Connect headphones, earbuds or a hearing aid to use the amplifier. " +
+                "Through the phone's speaker it would squeal and echo." to true
+        !uiState.amplifierWanted -> "Amplifier is off." to false
+        uiState.isRunning -> "Amplifier is on." to false
+        else -> "Starting… If nothing starts, try a lower sample rate below." to false
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (error) MaterialTheme.colorScheme.errorContainer
+            else MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Text(text, modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+// ─── Sound quality card ───────────────────────────────────────────────────────
+
+@Composable
+private fun SoundQualityCard(uiState: AudioUiState, onIntent: (AudioIntent) -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Sound quality", style = MaterialTheme.typography.titleMedium)
+
+            Text("Sample rate", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AudioSettings.SAMPLE_RATES.forEach { hz ->
+                    FilterChip(
+                        selected = uiState.sampleRate == hz,
+                        onClick = { onIntent(AudioIntent.SetSampleRate(hz)) },
+                        label = { Text("${hz / 1000} kHz") }
+                    )
+                }
+            }
+            Text(
+                "Keeps sound up to ${uiState.sampleRate / 2000} kHz. Higher is clearer but uses " +
+                    "more battery. Changing it restarts the amplifier briefly.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Text(
+                "Noise reduction: " + percentText(uiState.noiseStrength),
+                style = MaterialTheme.typography.labelLarge
+            )
+            Slider(
+                value = uiState.noiseStrength,
+                onValueChange = { onIntent(AudioIntent.SetNoiseStrength(it)) },
+                valueRange = 0f..1f
+            )
+            Text(
+                "0% leaves the sound untouched. The preset above sets the style.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Voice focus", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        "Turns down sound below 250 Hz and above 4 kHz so speech stands out. " +
+                            "This removes some of the sound range on purpose.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = uiState.voiceFocusEnabled,
+                    onCheckedChange = { onIntent(AudioIntent.SetVoiceFocus(it)) }
+                )
+            }
+            if (uiState.voiceFocusEnabled) {
+                Text(
+                    "Voice focus strength: " + percentText(uiState.voiceFocusStrength),
+                    style = MaterialTheme.typography.labelLarge
+                )
+                Slider(
+                    value = uiState.voiceFocusStrength,
+                    onValueChange = { onIntent(AudioIntent.SetVoiceFocusStrength(it)) },
+                    valueRange = 0f..1f
+                )
+            }
+        }
+    }
+}
+
+private fun percentText(strength: Float) = "${(strength * 100).toInt()}%"
 
 // ─── Loudness warning banner ──────────────────────────────────────────────────
 

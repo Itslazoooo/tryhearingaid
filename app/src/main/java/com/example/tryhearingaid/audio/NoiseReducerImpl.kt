@@ -101,6 +101,17 @@ class NoiseReducerImpl @Inject constructor(
 
     override fun getActivePreset(): EnvironmentPreset = activePreset
 
+    @Volatile
+    private var strength: Float = 0.5f
+
+    override fun setStrength(strength: Float) {
+        this.strength = strength.coerceIn(0f, 1f)
+    }
+
+    /** The active preset scaled by the user's strength (0.5 leaves the preset unchanged). */
+    private fun effectiveConfig(): SuppressionConfig =
+        activeConfig.copy(alpha = activeConfig.alpha * strength * 2f)
+
     // ── TFLite interpreter ────────────────────────────────────────────────────
 
     private var interpreter: Interpreter? = null
@@ -162,7 +173,7 @@ class NoiseReducerImpl @Inject constructor(
     // ── AudioProcessingStage ──────────────────────────────────────────────────
 
     override fun process(buffer: ShortArray, sampleRate: Int, channelCount: Int): ShortArray {
-        if (!isEnabled) return buffer
+        if (!isEnabled || strength <= 0f) return buffer
         return if (_isModelLoaded.value && interpreter != null) {
             processTFLite(buffer)
         } else {
@@ -184,7 +195,7 @@ class NoiseReducerImpl @Inject constructor(
                 mapOf(0 to outputFloat)
             )
             // Apply preset alpha as a blend between suppressed and original
-            val config = activeConfig
+            val config = effectiveConfig()
             val result = ShortArray(buffer.size) { i ->
                 val suppressed = outputFloat[0][i]
                 val blended = suppressed * config.alpha.coerceIn(0f, 1f) +
@@ -214,7 +225,7 @@ class NoiseReducerImpl @Inject constructor(
     internal fun processSpectralSubtraction(buffer: ShortArray): ShortArray {
         if (buffer.isEmpty()) return buffer
 
-        val config = activeConfig
+        val config = effectiveConfig()
         val n = buffer.size
 
         var sumSq = 0.0

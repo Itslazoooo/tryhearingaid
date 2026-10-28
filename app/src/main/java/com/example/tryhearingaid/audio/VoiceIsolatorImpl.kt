@@ -203,13 +203,25 @@ class VoiceIsolatorImpl @Inject constructor(
         // Pass-through: return buffer unmodified
         if (passThrough) return buffer
 
-        // When model is loaded use TFLite inference; otherwise pass through
+        // When a model is loaded use it; otherwise apply the simple speech-range filter, which
+        // does nothing at all while its strength is 0.
         return if (modelLoaded && interpreter != null) {
             processTFLite(buffer)
         } else {
-            buffer
+            focus.apply(buffer, sampleRate, focusStrength)
         }
     }
+
+    // ── Speech-range focus (used when no model is available) ──────────────────
+
+    @Volatile
+    private var focusStrength: Float = 0f
+
+    override fun setStrength(strength: Float) {
+        focusStrength = strength.coerceIn(0f, 1f)
+    }
+
+    private val focus = SpeechRangeFocus()
 
     // ── TFLite inference ──────────────────────────────────────────────────────
 
@@ -241,5 +253,64 @@ class VoiceIsolatorImpl @Inject constructor(
         var sumSq = 0.0
         for (s in buffer) sumSq += s.toDouble() * s.toDouble()
         return sqrt(sumSq / buffer.size).toFloat()
+    }
+}
+
+/**
+ * Turns down sound below [LOW_HZ] and above [HIGH_HZ] (the range speech lives in), mixed with the
+ * untouched sound by [apply]'s strength. At strength 0 the buffer is returned as it came.
+ */
+class SpeechRangeFocus {
+    private class Biquad {
+        var b0 = 1.0; var b1 = 0.0; var b2 = 0.0; var a1 = 0.0; var a2 = 0.0
+        private var z1 = 0.0
+        private var z2 = 0.0
+        fun step(x: Double): Double {
+            val y = b0 * x + z1
+            z1 = b1 * x - a1 * y + z2
+            z2 = b2 * x - a2 * y
+            return y
+        }
+    }
+
+    private val highPass = Biquad()
+    private val lowPass = Biquad()
+    private var designedFor = 0
+
+    fun apply(buffer: ShortArray, sampleRate: Int, strength: Float): ShortArray {
+        if (strength <= 0f || buffer.isEmpty()) return buffer
+        if (sampleRate != designedFor) design(sampleRate)
+        val s = strength.coerceIn(0f, 1f).toDouble()
+        return ShortArray(buffer.size) { i ->
+            val x = buffer[i].toDouble()
+            val filtered = lowPass.step(highPass.step(x))
+            (x * (1.0 - s) + filtered * s).toInt()
+                .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+        }
+    }
+
+    private fun design(sampleRate: Int) {
+        designedFor = sampleRate
+        set(highPass, LOW_HZ, sampleRate, high = true)
+        set(lowPass, HIGH_HZ, sampleRate, high = false)
+    }
+
+    private fun set(f: Biquad, hz: Double, sampleRate: Int, high: Boolean) {
+        val w0 = 2.0 * Math.PI * hz / sampleRate
+        val cosW = Math.cos(w0)
+        val alpha = Math.sin(w0) / (2.0 * Q)
+        val a0 = 1.0 + alpha
+        val b = if (high) (1.0 + cosW) / 2.0 else (1.0 - cosW) / 2.0
+        f.b0 = b / a0
+        f.b1 = (if (high) -(1.0 + cosW) else (1.0 - cosW)) / a0
+        f.b2 = b / a0
+        f.a1 = -2.0 * cosW / a0
+        f.a2 = (1.0 - alpha) / a0
+    }
+
+    companion object {
+        const val LOW_HZ = 250.0
+        const val HIGH_HZ = 4_000.0
+        private const val Q = 0.7071
     }
 }

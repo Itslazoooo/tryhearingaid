@@ -59,14 +59,17 @@ class SoundClassifierTap(
     }
 
     override fun process(buffer: ShortArray, sampleRate: Int, channelCount: Int): ShortArray {
-        if (sampleRate != EXPECTED_SAMPLE_RATE || channelCount != 1) return buffer
+        if (channelCount != 1) return buffer
+        // The recogniser needs 16 kHz, so higher rates are reduced by an exact factor first.
+        val factor = decimationFactor(sampleRate) ?: return buffer
+        val samples = if (factor == 1) buffer else downsample(buffer, factor)
 
-        for (sample in buffer) {
+        for (sample in samples) {
             ring[writePosition] = sample
             writePosition = (writePosition + 1) % windowSamples
         }
-        filled = minOf(windowSamples, filled + buffer.size)
-        samplesSinceEmit += buffer.size
+        filled = minOf(windowSamples, filled + samples.size)
+        samplesSinceEmit += samples.size
 
         if (filled == windowSamples && samplesSinceEmit >= hopSamples) {
             samplesSinceEmit = 0
@@ -91,6 +94,22 @@ class SoundClassifierTap(
 
     companion object {
         const val EXPECTED_SAMPLE_RATE = 16_000
+
+        /** How many input samples make one 16 kHz sample, or null if the rate is not a multiple of 16 kHz. */
+        fun decimationFactor(sampleRate: Int): Int? =
+            if (sampleRate >= EXPECTED_SAMPLE_RATE && sampleRate % EXPECTED_SAMPLE_RATE == 0) {
+                sampleRate / EXPECTED_SAMPLE_RATE
+            } else null
+
+        /** Averages each group of [factor] samples into one (a simple low-pass and reduction). */
+        fun downsample(buffer: ShortArray, factor: Int): ShortArray {
+            val n = buffer.size / factor
+            return ShortArray(n) { i ->
+                var sum = 0
+                for (k in 0 until factor) sum += buffer[i * factor + k]
+                (sum / factor).toShort()
+            }
+        }
 
         /** One YAMNet window: 0.975 s at 16 kHz. */
         const val DEFAULT_WINDOW_SAMPLES = 15_600

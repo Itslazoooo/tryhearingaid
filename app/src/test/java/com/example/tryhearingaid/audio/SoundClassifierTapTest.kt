@@ -98,11 +98,11 @@ class SoundClassifierTapTest {
     }
 
     @Test
-    fun `audio that is not 16 kHz mono is passed through and not classified`() {
+    fun `audio that is not mono or not a multiple of 16 kHz is passed through and not classified`() {
         val recorder = Recorder()
         val tap = tap(recorder)
 
-        tap.process(shorts(1..8), 48_000, 1)
+        tap.process(shorts(1..8), 44_100, 1)
         tap.process(shorts(1..8), 16_000, 2)
 
         recorder.windows.shouldBeEmpty()
@@ -130,5 +130,25 @@ class SoundClassifierTapTest {
     fun `the default window and hop match YAMNet`() {
         SoundClassifierTap.DEFAULT_WINDOW_SAMPLES shouldBe 15_600
         SoundClassifierTap.DEFAULT_HOP_SAMPLES shouldBe 7_800
+    }
+
+    @Test
+    fun `48 kHz audio is reduced to 16 kHz before it is classified`() {
+        val recorder = Recorder()
+        val tap = tap(recorder, window = 4, hop = 4)
+
+        // 12 samples at 48 kHz become 4 samples at 16 kHz: the average of each group of 3.
+        tap.process(shortArrayOf(3, 3, 3, 6, 6, 6, 9, 9, 9, 12, 12, 12), 48_000, 1)
+
+        recorder.windows.single() shouldBe listOf<Short>(3, 6, 9, 12)
+    }
+
+    @Test
+    fun `decimation factors`() {
+        SoundClassifierTap.decimationFactor(16_000) shouldBe 1
+        SoundClassifierTap.decimationFactor(32_000) shouldBe 2
+        SoundClassifierTap.decimationFactor(48_000) shouldBe 3
+        SoundClassifierTap.decimationFactor(44_100) shouldBe null
+        SoundClassifierTap.decimationFactor(8_000) shouldBe null
     }
 }

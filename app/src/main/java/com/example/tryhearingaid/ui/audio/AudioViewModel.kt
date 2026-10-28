@@ -5,7 +5,9 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.tryhearingaid.audio.AmplifierController
 import com.example.tryhearingaid.audio.AudioDirection
+import com.example.tryhearingaid.data.AudioSettings
 import com.example.tryhearingaid.audio.AudioEngine
 import com.example.tryhearingaid.audio.AudioEngineState
 import com.example.tryhearingaid.data.EnvironmentPreset
@@ -37,7 +39,15 @@ data class AudioUiState(
     val directionalDirection: AudioDirection = AudioDirection.Front,
     val isRunning: Boolean = false,
     val loudnessWarning: Boolean = false,
-    val isDirectionalAvailable: Boolean = false
+    val isDirectionalAvailable: Boolean = false,
+    /** Whether headphones, earbuds or a hearing aid are connected. The amplifier needs one. */
+    val headphonesConnected: Boolean = false,
+    /** Whether the user has the amplifier switched on (it only runs with headphones). */
+    val amplifierWanted: Boolean = true,
+    val sampleRate: Int = AudioSettings.DEFAULT_SAMPLE_RATE,
+    val noiseStrength: Float = AudioSettings.DEFAULT_STRENGTH,
+    val voiceFocusEnabled: Boolean = false,
+    val voiceFocusStrength: Float = AudioSettings.DEFAULT_STRENGTH
 )
 
 // ─── Intents ──────────────────────────────────────────────────────────────────
@@ -50,6 +60,10 @@ sealed class AudioIntent {
     data class ToggleAdaptive(val enabled: Boolean) : AudioIntent()
     data class SetNoisePreset(val preset: EnvironmentPreset) : AudioIntent()
     data class SetDirection(val direction: AudioDirection) : AudioIntent()
+    data class SetSampleRate(val hz: Int) : AudioIntent()
+    data class SetNoiseStrength(val strength: Float) : AudioIntent()
+    data class SetVoiceFocus(val enabled: Boolean) : AudioIntent()
+    data class SetVoiceFocusStrength(val strength: Float) : AudioIntent()
 }
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
@@ -66,6 +80,7 @@ sealed class AudioIntent {
 @HiltViewModel
 class AudioViewModel @Inject constructor(
     private val audioEngine: AudioEngine,
+    private val controller: AmplifierController,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -88,6 +103,31 @@ class AudioViewModel @Inject constructor(
                 )
             }
         }
+        viewModelScope.launch {
+            controller.headphonesConnected.collect { plugged ->
+                _uiState.value = _uiState.value.copy(headphonesConnected = plugged)
+            }
+        }
+        viewModelScope.launch {
+            controller.wanted.collect { wanted ->
+                _uiState.value = _uiState.value.copy(amplifierWanted = wanted)
+            }
+        }
+        viewModelScope.launch {
+            controller.settings.collect { settings ->
+                _uiState.value = _uiState.value.copy(
+                    noisePreset = settings.noisePreset,
+                    sampleRate = settings.sampleRate,
+                    noiseStrength = settings.noiseStrength,
+                    voiceFocusEnabled = settings.voiceFocusEnabled,
+                    voiceFocusStrength = settings.voiceFocusStrength
+                )
+            }
+        }
+    }
+
+    private fun updateSettings(transform: (AudioSettings) -> AudioSettings) {
+        viewModelScope.launch { controller.updateSettings(transform) }
     }
 
     /**
@@ -95,9 +135,9 @@ class AudioViewModel @Inject constructor(
      */
     fun handleIntent(intent: AudioIntent) {
         when (intent) {
-            is AudioIntent.Start -> audioEngine.start()
+            is AudioIntent.Start -> controller.setWanted(true)
 
-            is AudioIntent.Stop -> audioEngine.stop()
+            is AudioIntent.Stop -> controller.setWanted(false)
 
             is AudioIntent.SetGain -> {
                 val clamped = intent.dB.coerceIn(GAIN_MIN, GAIN_MAX)
@@ -110,9 +150,12 @@ class AudioViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(adaptiveEnabled = intent.enabled)
             }
 
-            is AudioIntent.SetNoisePreset -> {
-                _uiState.value = _uiState.value.copy(noisePreset = intent.preset)
-            }
+            is AudioIntent.SetNoisePreset -> updateSettings { it.copy(noisePreset = intent.preset) }
+            is AudioIntent.SetSampleRate -> updateSettings { it.copy(sampleRate = intent.hz) }
+            is AudioIntent.SetNoiseStrength -> updateSettings { it.copy(noiseStrength = intent.strength) }
+            is AudioIntent.SetVoiceFocus -> updateSettings { it.copy(voiceFocusEnabled = intent.enabled) }
+            is AudioIntent.SetVoiceFocusStrength ->
+                updateSettings { it.copy(voiceFocusStrength = intent.strength) }
 
             is AudioIntent.SetDirection -> {
                 _uiState.value = _uiState.value.copy(directionalDirection = intent.direction)

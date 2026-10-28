@@ -18,4 +18,10 @@ interface VoiceIsolator : AudioProcessingStage {
      * tracked.  0 when no speech is present or isolation is disabled.
      */
     val dominantSpeakerConfidence: StateFlow<Float>
+
+    /**
+     * How strongly sound outside the speech range is turned down, from 0 (off) to 1 (strongest).
+     * Ignored by implementations without it.
+     */
+    fun setStrength(strength: Float) {}
 }

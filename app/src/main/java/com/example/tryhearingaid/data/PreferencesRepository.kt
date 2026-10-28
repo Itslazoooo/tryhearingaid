@@ -5,6 +5,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -42,6 +44,8 @@ data class UserPreferences(
     val privacyAudioUploadConsent: Boolean = false,
     /** Emergency SOS phone numbers, at most [SosContacts.MAX_CONTACTS], in the order the user entered them. */
     val sosContacts: List<String> = emptyList(),
+    /** Sample rate, noise reduction and voice focus choices for the amplifier. */
+    val audioSettings: AudioSettings = AudioSettings(),
 )
 
 // ---------------------------------------------------------------------------
@@ -82,6 +86,9 @@ interface PreferencesRepository {
     /** Saves the SOS contacts after cleaning them with [SosContacts.normalize]. */
     suspend fun updateSosContacts(numbers: List<String>)
 
+    /** Save the amplifier's sound-quality settings. */
+    suspend fun updateAudioSettings(settings: AudioSettings)
+
     /** Resets every preference back to its default value. */
     suspend fun clearAll()
 }
@@ -116,6 +123,11 @@ class DataStorePreferencesRepository(
         val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
         val PRIVACY_AUDIO_UPLOAD_CONSENT = booleanPreferencesKey("privacy_audio_upload_consent")
         val SOS_CONTACTS = stringPreferencesKey("sos_contacts")
+        val AUDIO_SAMPLE_RATE = intPreferencesKey("audio_sample_rate")
+        val NOISE_PRESET = stringPreferencesKey("noise_preset")
+        val NOISE_STRENGTH = floatPreferencesKey("noise_strength")
+        val VOICE_FOCUS_ENABLED = booleanPreferencesKey("voice_focus_enabled")
+        val VOICE_FOCUS_STRENGTH = floatPreferencesKey("voice_focus_strength")
     }
 
     // -- Default sets (computed once) ----------------------------------------
@@ -143,6 +155,14 @@ class DataStorePreferencesRepository(
             ttsEnabled = prefs[Keys.TTS_ENABLED] ?: false,
             privacyAudioUploadConsent = prefs[Keys.PRIVACY_AUDIO_UPLOAD_CONSENT] ?: false,
             sosContacts = SosContacts.decode(prefs[Keys.SOS_CONTACTS]),
+            audioSettings = AudioSettings(
+                sampleRate = prefs[Keys.AUDIO_SAMPLE_RATE] ?: AudioSettings.DEFAULT_SAMPLE_RATE,
+                noisePreset = runCatching { EnvironmentPreset.valueOf(prefs[Keys.NOISE_PRESET] ?: "") }
+                    .getOrDefault(EnvironmentPreset.DEFAULT),
+                noiseStrength = prefs[Keys.NOISE_STRENGTH] ?: AudioSettings.DEFAULT_STRENGTH,
+                voiceFocusEnabled = prefs[Keys.VOICE_FOCUS_ENABLED] ?: false,
+                voiceFocusStrength = prefs[Keys.VOICE_FOCUS_STRENGTH] ?: AudioSettings.DEFAULT_STRENGTH
+            ).sanitized(),
         )
     }
 
@@ -189,6 +209,17 @@ class DataStorePreferencesRepository(
 
     override suspend fun updateSosContacts(numbers: List<String>) {
         dataStore.edit { it[Keys.SOS_CONTACTS] = SosContacts.encode(numbers) }
+    }
+
+    override suspend fun updateAudioSettings(settings: AudioSettings) {
+        val clean = settings.sanitized()
+        dataStore.edit {
+            it[Keys.AUDIO_SAMPLE_RATE] = clean.sampleRate
+            it[Keys.NOISE_PRESET] = clean.noisePreset.name
+            it[Keys.NOISE_STRENGTH] = clean.noiseStrength
+            it[Keys.VOICE_FOCUS_ENABLED] = clean.voiceFocusEnabled
+            it[Keys.VOICE_FOCUS_STRENGTH] = clean.voiceFocusStrength
+        }
     }
 
     override suspend fun clearAll() {
@@ -247,6 +278,10 @@ class InMemoryPreferencesRepository : PreferencesRepository {
 
     override suspend fun updateSosContacts(numbers: List<String>) {
         _state.value = _state.value.copy(sosContacts = SosContacts.normalize(numbers))
+    }
+
+    override suspend fun updateAudioSettings(settings: AudioSettings) {
+        _state.value = _state.value.copy(audioSettings = settings.sanitized())
     }
 
     override suspend fun clearAll() {

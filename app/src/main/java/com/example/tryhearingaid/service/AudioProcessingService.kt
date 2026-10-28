@@ -174,6 +174,10 @@ class AudioProcessingService : Service() {
     @Inject
     lateinit var profileManager: com.example.tryhearingaid.profiles.ProfileManager
 
+    /** Decides when the engine runs: only with headphones, at the chosen sample rate. */
+    @Inject
+    lateinit var amplifierController: com.example.tryhearingaid.audio.AmplifierController
+
     @Inject
     lateinit var wearableBridge: WearableBridgeImpl
 
@@ -400,10 +404,9 @@ class AudioProcessingService : Service() {
         // Promote to foreground before any audio work starts
         startForegroundWithMicrophoneType()
 
-        // Start the engine if it is idle
-        if (audioEngine.state.value == AudioEngineState.IDLE) {
-            audioEngine.start(AudioConfig())
-        }
+        // The controller starts the engine once headphones are connected, and stops it if they
+        // are removed. Calling begin() again is harmless.
+        amplifierController.begin()
 
         // Sticky so the OS restarts the service if it is killed with a non-null intent
         return START_STICKY
@@ -433,7 +436,7 @@ class AudioProcessingService : Service() {
         // The classifier is shared app-wide and cannot be reopened after close(), so it is only
         // switched off here (it is switched on again in onCreate) and freed when the process ends.
         soundClassifier.setEnabled(false)
-        audioEngine.stop()
+        amplifierController.end()
         // Stop following wearable state. The bridge itself is an app-wide singleton
         // shared with the dispatcher, so it is not released here.
         serviceScope.cancel()
