@@ -3,13 +3,16 @@ package com.example.tryhearingaid.ui.analytics
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.tryhearingaid.data.AnalyticsDashboard
-import com.example.tryhearingaid.data.DailyExposure
+import com.example.tryhearingaid.analytics.AnalyticsEngine
+import com.example.tryhearingaid.data.TrendReport
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 import javax.inject.Inject
 
 // ─── Warning level enum ───────────────────────────────────────────────────────
@@ -37,73 +40,34 @@ enum class DoseWarningLevel { NO_WARNING, MODERATE, HIGH }
  * repository call when the data layer is wired up.
  */
 @HiltViewModel
-class AnalyticsViewModel @Inject constructor() : ViewModel() {
+class AnalyticsViewModel @Inject constructor(
+    private val engine: AnalyticsEngine
+) : ViewModel() {
 
-    // ── Dashboard state ───────────────────────────────────────────────────────
+    /** Live dashboard from the analytics engine (Requirement 11.2). */
+    val dashboard: StateFlow<AnalyticsDashboard> = engine.dashboardData
 
-    private val _dashboard = MutableStateFlow(defaultDashboard())
-    /**
-     * Snapshot of the analytics dashboard:
-     * currentSpl, dailyDose, weeklyTrend, peakLevel.
-     *
-     * Requirement 11.2
-     */
-    val dashboard: StateFlow<AnalyticsDashboard> = _dashboard.asStateFlow()
+    /** NIOSH warning level for today's dose (Requirements 11.3, 11.4). */
+    val warningLevel: StateFlow<DoseWarningLevel> = engine.dashboardData
+        .map { warningFor(it.dailyDose) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), warningFor(engine.dashboardData.value.dailyDose))
 
-    // ── Warning level ─────────────────────────────────────────────────────────
+    private val _trendReport = MutableStateFlow<TrendReport?>(null)
+    /** The most recent 30-day report, or null until one has been requested. */
+    val trendReport: StateFlow<TrendReport?> = _trendReport.asStateFlow()
 
-    private val _warningLevel = MutableStateFlow(DoseWarningLevel.NO_WARNING)
-    /**
-     * Derived from [dashboard.dailyDose] according to NIOSH thresholds.
-     *
-     * Requirement 11.3, 11.4
-     */
-    val warningLevel: StateFlow<DoseWarningLevel> = _warningLevel.asStateFlow()
-
-    init {
-        // Recompute warning level whenever the dashboard updates.
-        viewModelScope.launch {
-            _dashboard.collect { data ->
-                _warningLevel.value = when {
-                    data.dailyDose >= 100f -> DoseWarningLevel.HIGH
-                    data.dailyDose >= 50f  -> DoseWarningLevel.MODERATE
-                    else                   -> DoseWarningLevel.NO_WARNING
-                }
-            }
-        }
-    }
-
-    // ── Intents ───────────────────────────────────────────────────────────────
-
-    /**
-     * User intent: generate a 30-day trend report.
-     *
-     * Requirement 11.6
-     */
+    /** User intent: generate a 30-day trend report (Requirement 11.6). */
     fun generateTrendReport() {
         viewModelScope.launch {
-            // TODO: delegate to AnalyticsEngine.generateTrendReport() and show result.
+            _trendReport.value = runCatching { engine.generateTrendReport(30) }.getOrNull()
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private fun defaultDashboard(): AnalyticsDashboard {
-        val today = LocalDate.now()
-        val weeklyTrend = (6 downTo 0).map { daysAgo ->
-            DailyExposure(
-                date         = today.minusDays(daysAgo.toLong()),
-                averageSpl   = (72f + daysAgo * 1.5f).coerceAtMost(85f),
-                peakSpl      = (85f + daysAgo * 0.5f).coerceAtMost(95f),
-                dosePercent  = (20f + daysAgo * 5f).coerceAtMost(110f),
-                isHighRisk   = (20f + daysAgo * 5f) >= 100f
-            )
+    companion object {
+        fun warningFor(dailyDosePercent: Float): DoseWarningLevel = when {
+            dailyDosePercent >= 100f -> DoseWarningLevel.HIGH
+            dailyDosePercent >= 50f -> DoseWarningLevel.MODERATE
+            else -> DoseWarningLevel.NO_WARNING
         }
-        return AnalyticsDashboard(
-            currentSpl   = 72.4f,
-            dailyDose    = 35f,
-            weeklyTrend  = weeklyTrend,
-            peakLevel    = 88.1f
-        )
     }
 }

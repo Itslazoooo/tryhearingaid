@@ -50,6 +50,19 @@ class ProfileManagerImpl(
     private val _activeProfile = MutableStateFlow<HearingProfile?>(null)
     override val activeProfile: StateFlow<HearingProfile?> = _activeProfile.asStateFlow()
 
+    /**
+     * Loads saved profiles from the database and re-activates the one that was active when the
+     * app last ran. Call once at startup; calling it again simply reloads.
+     */
+    suspend fun restore() {
+        val entities = profileDao.getAllProfiles().first()
+        val loaded = entities.map { loadFullProfile(it) }
+        _profiles.value = loaded
+        val activeId = preferencesRepository.userPreferences.first().activeProfileId
+        val toActivate = loaded.firstOrNull { it.id == activeId } ?: return
+        activateProfile(toActivate.id)
+    }
+
     // ── ProfileManager implementation ─────────────────────────────────────────
 
     override suspend fun saveProfile(profile: HearingProfile) {

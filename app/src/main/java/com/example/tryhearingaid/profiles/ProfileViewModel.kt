@@ -2,6 +2,8 @@ package com.example.tryhearingaid.profiles
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import com.example.tryhearingaid.data.Audiogram
 import com.example.tryhearingaid.data.EqBand
 import com.example.tryhearingaid.data.EnvironmentPreset
@@ -46,7 +48,8 @@ sealed class ProfileIntent {
  * [ProfileViewModel] exposes a single [StateFlow]<[ProfileUiState]> that the
  * Profiles screen collects.  All user actions are dispatched via [handleIntent].
  */
-class ProfileViewModel(
+@HiltViewModel
+class ProfileViewModel @Inject constructor(
     private val profileManager: ProfileManager,
     private val hearingTestEngine: HearingTestEngine
 ) : ViewModel() {

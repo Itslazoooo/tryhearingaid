@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.pow
 
@@ -50,7 +49,7 @@ import kotlin.math.pow
  * Requirements 11.1 – 11.6
  */
 @Singleton
-class AnalyticsEngineImpl @Inject constructor(
+class AnalyticsEngineImpl(
     private val audioEngine: AudioEngine,
     private val analyticsDao: AnalyticsDao,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,

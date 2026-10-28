@@ -97,6 +97,7 @@ class HearingTestEngineImpl(
     }
 
     override suspend fun cancelTest() {
+        tonePlayer.stop()
         _testState.value = HearingTestState.Idle
     }
 
@@ -135,11 +136,12 @@ class HearingTestEngineImpl(
     private fun presentCurrentTone() {
         val freq = testFrequencies[freqIndex]
         val level = testLevels[levelIndex]
-        tonePlayer.play(freq, level)
+        tonePlayer.play(freq, level, currentEar)
         _testState.value = HearingTestState.InProgress(freq, level, currentEar)
     }
 
     private suspend fun finishTest() {
+        tonePlayer.stop()
         val now = Instant.now()
 
         val audiogram = Audiogram(
@@ -189,11 +191,11 @@ class HearingTestEngineImpl(
  * [AudioEngine] to produce a sine wave at the requested parameters.
  */
 interface TonePlayer {
-    fun play(frequencyHz: Int, levelDbhl: Int)
+    fun play(frequencyHz: Int, levelDbhl: Int, ear: Ear)
     fun stop()
 }
 
 class NoOpTonePlayer : TonePlayer {
-    override fun play(frequencyHz: Int, levelDbhl: Int) { /* no-op for testing */ }
+    override fun play(frequencyHz: Int, levelDbhl: Int, ear: Ear) { /* no-op for testing */ }
     override fun stop() { /* no-op */ }
 }

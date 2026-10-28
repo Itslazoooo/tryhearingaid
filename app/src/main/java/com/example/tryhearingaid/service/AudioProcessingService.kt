@@ -163,6 +163,17 @@ class AudioProcessingService : Service() {
      * uses; a privately constructed bridge would have its own empty device list.
      * Available from [onCreate] after `super.onCreate()`.
      */
+    /**
+     * Injected only so it is created (and starts measuring exposure) with the service; the
+     * Analytics screen reads the same singleton.
+     */
+    @Inject
+    lateinit var analyticsEngine: com.example.tryhearingaid.analytics.AnalyticsEngine
+
+    /** Injected so saved profiles are loaded and the last active one re-applied on start. */
+    @Inject
+    lateinit var profileManager: com.example.tryhearingaid.profiles.ProfileManager
+
     @Inject
     lateinit var wearableBridge: WearableBridgeImpl
 
