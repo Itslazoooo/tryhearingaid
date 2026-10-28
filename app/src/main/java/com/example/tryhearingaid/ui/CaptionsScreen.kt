@@ -156,6 +156,18 @@ internal fun CaptionsScreenContent(
                 onExport = onExport
             )
 
+            val problem = when {
+                uiState.isUnavailable -> "Speech recognition is not available on this phone."
+                else -> uiState.engineError
+            }
+            if (problem != null) {
+                Text(
+                    text = problem,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
             // ── Caption list ──────────────────────────────────────────────────
             CaptionList(
                 segments = uiState.captions,

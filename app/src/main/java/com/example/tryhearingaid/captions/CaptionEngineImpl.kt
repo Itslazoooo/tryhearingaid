@@ -73,6 +73,14 @@ class CaptionEngineImpl @Inject constructor(
      * Exposed as observable state so the UI can show a fallback overlay
      * when speech recognition hardware / service is unavailable on the device.
      */
+    private val _lastError = MutableStateFlow<String?>(null)
+    override val lastError: StateFlow<String?> = _lastError.asStateFlow()
+
+    /** Set once the on-device recognizer fails for language reasons; the default one is used instead. */
+    @Volatile private var useDefaultRecognizer = false
+
+    private val mainHandler by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
+
     private val _isUnavailable = MutableStateFlow(false)
     override val isUnavailable: StateFlow<Boolean> = _isUnavailable.asStateFlow()
 
@@ -109,6 +117,7 @@ class CaptionEngineImpl @Inject constructor(
 
         override fun onReadyForSpeech(params: Bundle?) {
             Log.d(TAG, "onReadyForSpeech")
+            _lastError.value = null
         }
 
         override fun onBeginningOfSpeech() {
@@ -135,24 +144,54 @@ class CaptionEngineImpl @Inject constructor(
             val errorMsg = speechErrorToString(error)
             Log.w(TAG, "SpeechRecognizer error: $errorMsg ($error)")
 
+            var delayMs = RESTART_DELAY_MS
             when (error) {
-                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> {
-                    // Transient; restart will be attempted after a short delay
-                }
                 SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
+                    _lastError.value = "Microphone permission is missing."
                     _isUnavailable.value = true
                     _isActive.value = false
                     return
                 }
-                SpeechRecognizer.ERROR_NO_MATCH -> {
-                    // No speech detected; continue listening
+                SpeechRecognizer.ERROR_NO_MATCH,
+                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
+                    // Nobody spoke; keep listening, and do not show an error.
+                    delayMs = QUICK_RESTART_DELAY_MS
                 }
-                else -> { /* Fall through to restart */ }
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
+                SpeechRecognizer.ERROR_CLIENT -> {
+                    _lastError.value = "The speech recognizer is busy. Retrying…"
+                    delayMs = BUSY_RESTART_DELAY_MS
+                }
+                SpeechRecognizer.ERROR_AUDIO -> {
+                    _lastError.value = "Could not use the microphone (it may be in use). Retrying…"
+                    delayMs = BUSY_RESTART_DELAY_MS
+                }
+                SpeechRecognizer.ERROR_NETWORK,
+                SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
+                SpeechRecognizer.ERROR_SERVER -> {
+                    _lastError.value = "Speech recognition needs an internet connection or an " +
+                        "offline language pack (Settings → Google → Offline speech recognition)."
+                    delayMs = BUSY_RESTART_DELAY_MS
+                }
+                ERROR_LANGUAGE_NOT_SUPPORTED, ERROR_LANGUAGE_UNAVAILABLE -> {
+                    // The on-device recognizer lacks this language: use the normal recognizer.
+                    if (!useDefaultRecognizer) {
+                        useDefaultRecognizer = true
+                        delayMs = QUICK_RESTART_DELAY_MS
+                    } else {
+                        _lastError.value = "This language is not available for speech recognition."
+                        delayMs = BUSY_RESTART_DELAY_MS
+                    }
+                }
+                else -> {
+                    _lastError.value = "Speech recognition error ($errorMsg). Retrying…"
+                    delayMs = BUSY_RESTART_DELAY_MS
+                }
             }
 
-            // Restart listening if we should still be active
+            // Restart after a pause, never in a tight loop, if we should still be active.
             if (_isActive.value) {
-                restartRecognition()
+                scheduleRestart(delayMs)
             }
         }
 
@@ -161,6 +200,7 @@ class CaptionEngineImpl @Inject constructor(
             val confidences = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
 
             if (!matches.isNullOrEmpty()) {
+                _lastError.value = null
                 val text = matches[0]
                 val confidence = confidences?.getOrNull(0) ?: DEFAULT_CONFIDENCE_THRESHOLD
                 emitSegment(text, confidence)
@@ -206,6 +246,8 @@ class CaptionEngineImpl @Inject constructor(
         }
 
         // Reset session state
+        _lastError.value = null
+        useDefaultRecognizer = false
         currentSpeakerIndex = 1
         lastSegmentEnergy = 0f
         lastSegmentTimeMs = System.currentTimeMillis()
@@ -225,6 +267,8 @@ class CaptionEngineImpl @Inject constructor(
      */
     override fun stop() {
         _isActive.value = false
+        _lastError.value = null
+        mainHandlerOrNull()?.removeCallbacksAndMessages(null)
         recognizer?.stopListening()
         recognizer?.destroy()
         recognizer = null
@@ -260,21 +304,20 @@ class CaptionEngineImpl @Inject constructor(
 
         _isUnavailable.value = false
 
-        // Prefer on-device recognizer (Android 13 / ML Kit) when available
-        val newRecognizer = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            // API 31+: attempt on-device recognizer, fall back to default on failure
+        // Prefer the on-device recognizer when the phone reports it is really available (API 33+),
+        // otherwise (or after a language error) use the normal system recognizer.
+        val onDevice = !useDefaultRecognizer &&
+            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+        val newRecognizer = if (onDevice) {
             try {
-                SpeechRecognizer.createOnDeviceSpeechRecognizer(context).also {
-                    Log.d(TAG, "Using on-device SpeechRecognizer (API 31+)")
-                }
+                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
             } catch (e: Exception) {
                 Log.w(TAG, "On-device recognizer unavailable, using default: ${e.message}")
                 SpeechRecognizer.createSpeechRecognizer(context)
             }
         } else {
-            SpeechRecognizer.createSpeechRecognizer(context).also {
-                Log.d(TAG, "Using default SpeechRecognizer (API < 31)")
-            }
+            SpeechRecognizer.createSpeechRecognizer(context)
         }
 
         newRecognizer.setRecognitionListener(recognitionListener)
@@ -292,8 +335,8 @@ class CaptionEngineImpl @Inject constructor(
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, mapToAndroidLocale(activeLanguageCode))
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            // Prefer on-device recognition (ML Kit) to avoid network dependency
-            putExtra("android.speech.extra.PREFER_OFFLINE", true)
+            // Prefer offline recognition only while the on-device recognizer is in use.
+            if (!useDefaultRecognizer) putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
         }
         recognizer?.startListening(intent)
     }
@@ -303,6 +346,16 @@ class CaptionEngineImpl @Inject constructor(
      * session. This is the standard pattern for continuous recognition since
      * [SpeechRecognizer] stops after each utterance.
      */
+    private fun mainHandlerOrNull(): android.os.Handler? =
+        runCatching { mainHandler }.getOrNull()
+
+    /** Restart recognition on the main thread after [delayMs] (SpeechRecognizer needs the main thread). */
+    private fun scheduleRestart(delayMs: Long) {
+        mainHandler.postDelayed({
+            if (_isActive.value) restartRecognition()
+        }, delayMs)
+    }
+
     private fun restartRecognition() {
         recognizer?.destroy()
         recognizer = null
@@ -439,6 +492,13 @@ class CaptionEngineImpl @Inject constructor(
             "pt"  to "pt-BR",
             "hi"  to "hi-IN"
         )
+
+        private const val RESTART_DELAY_MS = 500L
+        private const val QUICK_RESTART_DELAY_MS = 150L
+        private const val BUSY_RESTART_DELAY_MS = 1_500L
+        // Error codes added in API 31; kept as plain numbers so older compile targets still build.
+        private const val ERROR_LANGUAGE_NOT_SUPPORTED = 12
+        private const val ERROR_LANGUAGE_UNAVAILABLE = 13
 
         /** Convert [SpeechRecognizer] error codes to readable strings for logging. */
         private fun speechErrorToString(error: Int): String = when (error) {

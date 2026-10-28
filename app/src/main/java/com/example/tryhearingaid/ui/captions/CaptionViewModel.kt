@@ -68,6 +68,7 @@ data class CaptionUiState(
     val isActive: Boolean = false,
     val selectedLanguage: CaptionLanguage = SUPPORTED_CAPTION_LANGUAGES[1], // default: English
     val isUnavailable: Boolean = false,
+    val engineError: String? = null,
     val isClassroomMode: Boolean = false,
     val studyNotes: StudyNotes? = null,
     val keywordContext: List<CaptionSegment> = emptyList(),
@@ -143,6 +144,13 @@ class CaptionViewModel @Inject constructor(
         viewModelScope.launch {
             captionEngine.isActive.collect { active ->
                 _uiState.value = _uiState.value.copy(isActive = active)
+            }
+        }
+
+        // Mirror the engine's "why is there no text" message into UI state.
+        viewModelScope.launch {
+            captionEngine.lastError.collect { message ->
+                _uiState.value = _uiState.value.copy(engineError = message)
             }
         }
 

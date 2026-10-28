@@ -141,7 +141,16 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
 
         /** Minimum allowed gain in dB (Requirement 1.2). */
         const val GAIN_MIN_DB = 0f
+
+        /** Frames of silence written before playback starts. */
+        private const val PREFILL_FRAMES = 3
+
+        /** How fast the loudness limiter lets go after a loud moment (per frame, 0..1). */
+        private const val LIMITER_RELEASE = 0.02f
     }
+
+    /** Smoothed gain used by the loudness limiter, so loudness changes are gradual, not choppy. */
+    private var limiterGain: Float = 1f
 
     // ── AudioEngine interface ─────────────────────────────────────────────────
 
@@ -322,8 +331,10 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
      */
     private fun initAudioDevices(config: AudioConfig) {
         val sampleRate = config.sampleRate
-        val minBufSize = AudioRecord.getMinBufferSize(sampleRate, CHANNEL_IN, ENCODING)
-            .coerceAtLeast(config.frameSize * 2 * 2) // at least 2 frames, 2 bytes per sample
+        // Generous buffers (about 80 ms) stop the crackling that very small buffers cause when the
+        // audio thread is delayed for even a moment.
+        val minBufSize = (AudioRecord.getMinBufferSize(sampleRate, CHANNEL_IN, ENCODING) * 2)
+            .coerceAtLeast(config.frameSize * 2 * 8)
 
         val recordBuilder = AudioRecord.Builder()
             .setAudioSource(MediaRecorder.AudioSource.MIC)
@@ -342,8 +353,8 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
             throw IllegalStateException("AudioRecord failed to initialise (state=${record.state})")
         }
 
-        val outMinBufSize = AudioTrack.getMinBufferSize(sampleRate, CHANNEL_OUT, ENCODING)
-            .coerceAtLeast(config.frameSize * 2 * 2)
+        val outMinBufSize = (AudioTrack.getMinBufferSize(sampleRate, CHANNEL_OUT, ENCODING) * 2)
+            .coerceAtLeast(config.frameSize * 2 * 8)
 
         val trackBuilder = AudioTrack.Builder()
             .setAudioAttributes(buildOutputAttributes(config))
@@ -411,6 +422,9 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
         adaptiveTargetGainDb = 0f
         adaptiveCurrentGainDb = 0f
 
+        // Start the output with a little silence so it does not run dry (and crackle) at the start.
+        track.write(ShortArray(frameSize * PREFILL_FRAMES), 0, frameSize * PREFILL_FRAMES)
+        limiterGain = 1f
         record.startRecording()
         track.play()
         running = true
@@ -496,22 +510,27 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
      * Returns the modified samples (same array, modified in place).
      */
     private fun applyGainWithLoudnessCheck(samples: ShortArray): ShortArray {
-        var effectiveGain = gainLinear
-
-        // Pre-compute RMS of the post-gain signal to detect SPL ceiling breach
+        if (samples.isEmpty()) return samples
         val rms = computeRms(samples)
-        val projectedRms = rms * effectiveGain
 
-        if (projectedRms > spl85RmsThreshold) {
-            // Clamp gain so projected RMS equals the ceiling
-            effectiveGain = if (rms > 0f) spl85RmsThreshold / rms else effectiveGain
+        // The most gain that keeps this frame at or below the 85 dB SPL ceiling.
+        var target = gainLinear
+        if (rms > 0f && rms * target > spl85RmsThreshold) {
+            target = spl85RmsThreshold / rms
             // Emit loudness warning (non-blocking; drops if buffer is full)
             _loudnessWarning.tryEmit(Unit)
         }
 
-        // Apply the (possibly clamped) gain
-        for (i in samples.indices) {
-            val amplified = (samples[i] * effectiveGain).toInt()
+        // Go down at once when a sound is too loud, come back up slowly. The gain then glides
+        // across the frame instead of jumping at frame edges, which would sound like crackle.
+        val start = limiterGain
+        val end = if (target < start) target else start + (target - start) * LIMITER_RELEASE
+        limiterGain = end
+
+        val n = samples.size
+        for (i in 0 until n) {
+            val g = start + (end - start) * (i + 1) / n
+            val amplified = (samples[i] * g).toInt()
             samples[i] = amplified.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
         }
         return samples

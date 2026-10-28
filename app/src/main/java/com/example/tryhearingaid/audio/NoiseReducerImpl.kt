@@ -47,6 +47,8 @@ class NoiseReducerImpl @Inject constructor(
     companion object {
         private const val TAG = "NoiseReducerImpl"
         private const val MODEL_FILENAME = "noise_suppression.tflite"
+        private const val WARM_UP_FRAMES = 20
+        private const val GATE_CLOSE_STEP = 0.04f
     }
 
     // ── State flows ───────────────────────────────────────────────────────────
@@ -201,15 +203,13 @@ class NoiseReducerImpl @Inject constructor(
     // ── Spectral-subtraction fallback ─────────────────────────────────────────
 
     /**
-     * Simple time-domain spectral subtraction approximation.
+     * Gentle noise gate used when the neural noise model is not available.
      *
-     * Because true spectral subtraction requires FFT infrastructure (not available
-     * in a plain Kotlin unit-testable class without NDK), this fallback uses a
-     * magnitude-based RMS noise estimate and subtracts it frame-wise, which
-     * provides a lightweight but functional noise-reduction effect.
-     *
-     * For production quality a proper FFT-based implementation (e.g. via Oboe or
-     * a KotlinFFT library) would be wired in here.
+     * It follows the quietest level it hears (the background noise) and, when the current frame
+     * is not clearly louder than that, turns the volume down smoothly instead of removing sound
+     * from each individual sample. The earlier sample-by-sample subtraction badly distorted
+     * speech. Here the gain moves gradually, never drops below a fixed floor, and speech passes
+     * through untouched.
      */
     internal fun processSpectralSubtraction(buffer: ShortArray): ShortArray {
         if (buffer.isEmpty()) return buffer
@@ -217,39 +217,43 @@ class NoiseReducerImpl @Inject constructor(
         val config = activeConfig
         val n = buffer.size
 
-        // 1. Estimate noise power from this frame (warm-up: first 10 frames are baseline)
-        val framePower = buffer.fold(0.0) { acc, s -> acc + s.toDouble() * s }.toFloat() / n
-        val noiseEst = if (frameCount < 10) {
-            // During warm-up accumulate a baseline noise estimate
-            val prev = noisePowerEstimate?.get(0) ?: framePower
-            val updated = noiseEstimateAlpha * prev + (1f - noiseEstimateAlpha) * framePower
-            noisePowerEstimate = floatArrayOf(updated)
-            updated
-        } else {
-            val prev = noisePowerEstimate?.get(0) ?: framePower
-            val updated = noiseEstimateAlpha * prev + (1f - noiseEstimateAlpha) * framePower
-            noisePowerEstimate = floatArrayOf(updated)
-            updated
-        }
+        var sumSq = 0.0
+        for (s in buffer) sumSq += s.toDouble() * s
+        val rms = sqrt(sumSq / n).toFloat()
 
+        // Track the background level: drop quickly to quiet moments, rise very slowly.
+        gateNoiseFloor = when {
+            frameCount == 0 -> rms
+            rms < gateNoiseFloor -> gateNoiseFloor * 0.8f + rms * 0.2f
+            else -> gateNoiseFloor * 1.001f + 0.01f
+        }
         frameCount++
 
-        // 2. Compute RMS noise amplitude
-        val noiseRms = sqrt(max(noiseEst, 0f))
+        // Never attenuate by more than this (stronger presets allow more).
+        val minGain = (0.5f / config.alpha).coerceIn(0.15f, 0.5f)
+        val threshold = max(gateNoiseFloor * (1f + config.alpha), 50f)
 
-        // 3. Subtract noise estimate from each sample (with spectral floor β)
-        val result = ShortArray(n) { i ->
-            val s = buffer[i].toFloat()
-            val sign = if (s >= 0f) 1f else -1f
-            val magnitude = abs(s)
-            // Over-subtract by α, enforce spectral floor β × |s|
-            val suppressed = max(magnitude - config.alpha * noiseRms, config.beta * magnitude)
-            (sign * suppressed).toInt()
+        val target = when {
+            frameCount <= WARM_UP_FRAMES -> 1f // still learning what "quiet" is
+            rms >= threshold -> 1f
+            else -> max(minGain, rms / threshold)
+        }
+
+        // Open at once for speech, close slowly (about a quarter second) so words are not clipped.
+        val start = gateGain
+        val end = if (target > start) target else max(target, start - GATE_CLOSE_STEP)
+        gateGain = end
+
+        return ShortArray(n) { i ->
+            val g = start + (end - start) * (i + 1) / n
+            (buffer[i] * g).toInt()
                 .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
                 .toShort()
         }
-        return result
     }
+
+    private var gateNoiseFloor: Float = 0f
+    private var gateGain: Float = 1f
 
     /** Whether the spectral-subtraction fallback is currently active. */
     fun isSpectralSubtractionActive(): Boolean = spectralSubtractionActive

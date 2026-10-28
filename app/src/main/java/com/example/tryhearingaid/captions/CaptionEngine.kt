@@ -29,6 +29,13 @@ interface CaptionEngine {
     val isUnavailable: StateFlow<Boolean>
 
     /**
+     * A short, user-readable reason recognition is not producing text right now (for example the
+     * microphone is busy), or null while things are working. Defaults to null.
+     */
+    val lastError: StateFlow<String?>
+        get() = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    /**
      * Start continuous speech recognition in [languageCode].
      * If already active this is a no-op.
      */
