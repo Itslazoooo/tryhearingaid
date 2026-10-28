@@ -25,6 +25,7 @@ import com.example.tryhearingaid.audio.AudioRoutePolicy
 import com.example.tryhearingaid.audio.DirectionalFilterImpl
 import com.example.tryhearingaid.audio.EqualizerImpl
 import com.example.tryhearingaid.audio.NoiseReducerImpl
+import com.example.tryhearingaid.audio.SoundClassifierTap
 import com.example.tryhearingaid.audio.VoiceIsolatorImpl
 import com.example.tryhearingaid.captions.CaptionEngine
 import com.example.tryhearingaid.classification.EmergencyDetectorImpl
@@ -74,52 +75,55 @@ class AudioProcessingService : Service() {
 
     // ── Audio engine ──────────────────────────────────────────────────────────
 
-    /**
-     * Owned [AudioEngineImpl] instance. Created when the service is created and
-     * released when it is destroyed.
-     */
-    private val audioEngine = AudioEngineImpl()
+    // Everything below is injected by Hilt and shared app-wide. The ViewModels receive these very
+    // same objects, so a gain change or a profile switch on screen reaches the audio that is
+    // actually playing. They outlive the service, so [onDestroy] must not release them.
+
+    /** The app-wide audio engine. */
+    @Inject
+    lateinit var audioEngine: AudioEngineImpl
 
     /**
-     * [DirectionalFilterImpl] wired as the first stage in the pipeline (before NoiseReducer).
+     * Hands the microphone audio to [soundClassifier], one second at a time. First stage in the
+     * pipeline, so the classifier hears the raw sound before any processing.
+     */
+    @Inject
+    lateinit var classifierTap: SoundClassifierTap
+
+    /**
+     * [DirectionalFilterImpl], second stage in the pipeline.
      * On single-mic devices it acts as a transparent pass-through.
-     * Lazily initialised in [onCreate] once a Context is available.
      */
-    private lateinit var directionalFilter: DirectionalFilterImpl
+    @Inject
+    lateinit var directionalFilter: DirectionalFilterImpl
+
+    /** [NoiseReducerImpl], applied after the directional filter. */
+    @Inject
+    lateinit var noiseReducer: NoiseReducerImpl
+
+    /** [VoiceIsolatorImpl], applied after [noiseReducer]. */
+    @Inject
+    lateinit var voiceIsolator: VoiceIsolatorImpl
 
     /**
-     * NoiseReducerImpl wired into the pipeline after DirectionalFilter.
-     * Lazily initialised in [onCreate] once a Context is available.
+     * [EqualizerImpl], applied after the voice isolator: per-band IIR gain before the adaptive
+     * gain and AudioTrack output.
      */
-    private lateinit var noiseReducer: NoiseReducerImpl
+    @Inject
+    lateinit var equalizer: EqualizerImpl
 
-    /**
-     * VoiceIsolatorImpl wired into the pipeline after [noiseReducer].
-     * Lazily initialised in [onCreate] once a Context is available.
-     */
-    private lateinit var voiceIsolator: VoiceIsolatorImpl
-
-    /**
-     * [EqualizerImpl] wired as the last stage in the pipeline (after VoiceIsolator),
-     * applying per-band IIR gain before the adaptive gain and AudioTrack output.
-     * Lazily initialised in [onCreate].
-     */
-    private lateinit var equalizer: EqualizerImpl
-
-    /**
-     * [SoundClassifierImpl] that runs YAMNet classification on audio frames.
-     * Lazily initialised in [onCreate] once a Context is available.
-     */
-    private lateinit var soundClassifier: SoundClassifierImpl
+    /** [SoundClassifierImpl] that runs YAMNet classification on the windows from [classifierTap]. */
+    @Inject
+    lateinit var soundClassifier: SoundClassifierImpl
 
     /**
      * [EmergencyDetectorImpl] subscribed to [soundClassifier]'s detections flow.
      *
-     * Started in [onCreate] and stopped only in [onDestroy] so that emergency
-     * detection remains active even when other features are paused.
-     * Requirement 10.5.
+     * Started in [onCreate] and stopped in [onDestroy] so that emergency detection stays active
+     * even when other features are paused. Requirement 10.5.
      */
-    private lateinit var emergencyDetector: EmergencyDetectorImpl
+    @Inject
+    lateinit var emergencyDetector: EmergencyDetectorImpl
 
     /**
      * Partial wake lock held for the whole service lifetime so the CPU keeps running, and the
@@ -221,24 +225,18 @@ class AudioProcessingService : Service() {
         Log.d(TAG, "onCreate")
         createNotificationChannel()
 
-        // Instantiate and wire all processing stages into the pipeline in order:
-        // DirectionalFilter → NoiseReducer → VoiceIsolator → Equalizer
+        // Wire the (injected, shared) stages into the pipeline in order:
+        // SoundClassifierTap → DirectionalFilter → NoiseReducer → VoiceIsolator → Equalizer
         // (Adaptive gain and AudioTrack output are applied after all stages.)
-        directionalFilter = DirectionalFilterImpl(this)
-        noiseReducer = NoiseReducerImpl(this)
-        voiceIsolator = VoiceIsolatorImpl(this)
-        equalizer = EqualizerImpl()
-
+        // The engine ignores a stage it already has, so a restarted service adds nothing twice.
+        audioEngine.addProcessingStage(classifierTap)
         audioEngine.addProcessingStage(directionalFilter)
         audioEngine.addProcessingStage(noiseReducer)
         audioEngine.addProcessingStage(voiceIsolator)
         audioEngine.addProcessingStage(equalizer)
 
-        // Instantiate SoundClassifier and EmergencyDetector.
         // EmergencyDetector subscribes to SoundClassifier.detections and must
         // remain active for the entire service lifetime (Requirement 10.5).
-        soundClassifier = SoundClassifierImpl(this)
-        emergencyDetector = EmergencyDetectorImpl(soundClassifier)
         emergencyDetector.start()
         Log.d(TAG, "EmergencyDetector started — always-on subscription active.")
         acquireWakeLock()
@@ -363,7 +361,8 @@ class AudioProcessingService : Service() {
         // Stop emergency detector before the audio engine so any in-flight
         // detections are cleanly cancelled before pipeline teardown.
         emergencyDetector.stop()
-        soundClassifier.close()
+        // The classifier is shared app-wide and cannot be reopened after close(), so it is left
+        // loaded here and freed when the process ends.
         audioEngine.stop()
         // Stop following wearable state. The bridge itself is an app-wide singleton
         // shared with the dispatcher, so it is not released here.

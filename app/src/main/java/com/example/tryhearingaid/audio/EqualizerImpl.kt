@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.pow
@@ -31,6 +32,7 @@ import kotlin.math.sin
  * recomputed atomically from that state before each [process] call, so changes take
  * effect within the very next audio frame — well inside the 100 ms requirement.
  */
+@Singleton // Shared by the audio service and the profile screens.
 class EqualizerImpl @Inject constructor() : Equalizer {
 
     // ── Constants ─────────────────────────────────────────────────────────────

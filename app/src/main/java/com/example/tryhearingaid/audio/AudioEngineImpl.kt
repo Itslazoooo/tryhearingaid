@@ -10,6 +10,7 @@ import android.os.HandlerThread
 import android.os.Process
 import android.util.Log
 import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -48,6 +49,7 @@ import kotlin.math.sqrt
  * ### Adaptive mode
  * [setAdaptiveMode] stores the flag; the actual adaptive loop is implemented in task 3.4.
  */
+@Singleton // One engine for the whole app: the service and the ViewModels must share it.
 class AudioEngineImpl @Inject constructor() : AudioEngine {
 
     // ── Public state ──────────────────────────────────────────────────────────
@@ -228,10 +230,16 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
     /**
      * Append [stage] to the end of the audio processing chain.
      * Stages are applied in insertion order during the audio I/O loop.
+     *
+     * Adding a stage that is already in the chain (the same object) does nothing. The engine
+     * outlives the audio service, and the service adds its stages every time it starts, so
+     * without this check a restarted service would process the audio twice.
      */
     override fun addProcessingStage(stage: AudioProcessingStage) {
         synchronized(processingStages) {
-            processingStages.add(stage)
+            if (processingStages.none { it === stage }) {
+                processingStages.add(stage)
+            }
         }
     }
 
