@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.tryhearingaid.audio.AudioDirection
 import com.example.tryhearingaid.data.AudioSettings
+import com.example.tryhearingaid.data.LatencyMode
 import com.example.tryhearingaid.data.EnvironmentPreset
 import com.example.tryhearingaid.ui.audio.AudioIntent
 import com.example.tryhearingaid.ui.audio.AudioUiState
@@ -101,6 +102,7 @@ fun AmplifierContent(
         // ── Gain slider ───────────────────────────────────────────────────────
         GainSliderCard(
             gainDb = uiState.gain,
+            outputLevelDb = uiState.outputLevelDb,
             onGainChange = { onIntent(AudioIntent.SetGain(it)) }
         )
 
@@ -159,6 +161,42 @@ private fun SoundQualityCard(uiState: AudioUiState, onIntent: (AudioIntent) -> U
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Sound quality", style = MaterialTheme.typography.titleMedium)
 
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Raw audio (no effects)", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        "The microphone sound goes straight to your headphones, only louder by " +
+                            "the gain. Noise reduction, voice focus, the equalizer and the " +
+                            "loudness limiter are skipped. Turn it off to use them.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = uiState.rawMode,
+                    onCheckedChange = { onIntent(AudioIntent.SetRawMode(it)) }
+                )
+            }
+
+            Text("Delay", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                LatencyMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = uiState.latency == mode,
+                        onClick = { onIntent(AudioIntent.SetLatency(mode)) },
+                        label = { Text("${mode.estimatedDelayMs} ms") }
+                    )
+                }
+            }
+            Text(
+                "${uiState.latency.label}: about ${uiState.latency.estimatedDelayMs} ms added by the " +
+                    "app, plus your phone and headphones (Bluetooth adds a lot). Lower delay can " +
+                    "crackle; higher delay is smoother. The sample rate below does not change " +
+                    "the delay.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             Text("Sample rate", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AudioSettings.SAMPLE_RATES.forEach { hz ->
@@ -176,6 +214,13 @@ private fun SoundQualityCard(uiState: AudioUiState, onIntent: (AudioIntent) -> U
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            if (uiState.rawMode) {
+                Text(
+                    "Noise reduction and voice focus are ignored while Raw audio is on.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
             Text(
                 "Noise reduction: " + percentText(uiState.noiseStrength),
                 style = MaterialTheme.typography.labelLarge
@@ -290,6 +335,7 @@ private fun StartStopRow(
 @Composable
 private fun GainSliderCard(
     gainDb: Float,
+    outputLevelDb: Float,
     onGainChange: (Float) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -309,6 +355,11 @@ private fun GainSliderCard(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+            Text(
+                text = "Output level: ${outputLevelDb.toInt()} dB",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(modifier = Modifier.height(8.dp))
             Slider(
                 value = gainDb,

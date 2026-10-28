@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.tryhearingaid.audio.AmplifierController
 import com.example.tryhearingaid.audio.AudioDirection
 import com.example.tryhearingaid.data.AudioSettings
+import com.example.tryhearingaid.data.LatencyMode
+import kotlinx.coroutines.delay
 import com.example.tryhearingaid.audio.AudioEngine
 import com.example.tryhearingaid.audio.AudioEngineState
 import com.example.tryhearingaid.data.EnvironmentPreset
@@ -44,6 +46,10 @@ data class AudioUiState(
     val headphonesConnected: Boolean = false,
     /** Whether the user has the amplifier switched on (it only runs with headphones). */
     val amplifierWanted: Boolean = true,
+    val rawMode: Boolean = true,
+    val latency: LatencyMode = LatencyMode.BALANCED,
+    /** Output level in dB (0 to 96, relative to full scale), to see the gain working. */
+    val outputLevelDb: Float = 0f,
     val sampleRate: Int = AudioSettings.DEFAULT_SAMPLE_RATE,
     val noiseStrength: Float = AudioSettings.DEFAULT_STRENGTH,
     val voiceFocusEnabled: Boolean = false,
@@ -60,6 +66,8 @@ sealed class AudioIntent {
     data class ToggleAdaptive(val enabled: Boolean) : AudioIntent()
     data class SetNoisePreset(val preset: EnvironmentPreset) : AudioIntent()
     data class SetDirection(val direction: AudioDirection) : AudioIntent()
+    data class SetRawMode(val enabled: Boolean) : AudioIntent()
+    data class SetLatency(val mode: LatencyMode) : AudioIntent()
     data class SetSampleRate(val hz: Int) : AudioIntent()
     data class SetNoiseStrength(val strength: Float) : AudioIntent()
     data class SetVoiceFocus(val enabled: Boolean) : AudioIntent()
@@ -116,12 +124,27 @@ class AudioViewModel @Inject constructor(
         viewModelScope.launch {
             controller.settings.collect { settings ->
                 _uiState.value = _uiState.value.copy(
+                    rawMode = settings.rawMode,
+                    latency = settings.latency,
                     noisePreset = settings.noisePreset,
                     sampleRate = settings.sampleRate,
                     noiseStrength = settings.noiseStrength,
                     voiceFocusEnabled = settings.voiceFocusEnabled,
                     voiceFocusStrength = settings.voiceFocusStrength
                 )
+            }
+        }
+    }
+
+    init {
+        // A live level reading, so the effect of the gain slider can be seen.
+        viewModelScope.launch {
+            while (true) {
+                delay(250)
+                val level = audioEngine.getCurrentSplDb()
+                if (level != _uiState.value.outputLevelDb) {
+                    _uiState.value = _uiState.value.copy(outputLevelDb = level)
+                }
             }
         }
     }
@@ -151,6 +174,8 @@ class AudioViewModel @Inject constructor(
             }
 
             is AudioIntent.SetNoisePreset -> updateSettings { it.copy(noisePreset = intent.preset) }
+            is AudioIntent.SetRawMode -> updateSettings { it.copy(rawMode = intent.enabled) }
+            is AudioIntent.SetLatency -> updateSettings { it.copy(latency = intent.mode) }
             is AudioIntent.SetSampleRate -> updateSettings { it.copy(sampleRate = intent.hz) }
             is AudioIntent.SetNoiseStrength -> updateSettings { it.copy(noiseStrength = intent.strength) }
             is AudioIntent.SetVoiceFocus -> updateSettings { it.copy(voiceFocusEnabled = intent.enabled) }

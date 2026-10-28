@@ -321,7 +321,11 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
         }
         return AudioAttributes.Builder()
             .setUsage(usage)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            // Raw mode asks for no speech-specific treatment from the system.
+            .setContentType(
+                if (config.rawMode) AudioAttributes.CONTENT_TYPE_MUSIC
+                else AudioAttributes.CONTENT_TYPE_SPEECH
+            )
             .build()
     }
 
@@ -333,11 +337,12 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
         val sampleRate = config.sampleRate
         // Generous buffers (about 80 ms) stop the crackling that very small buffers cause when the
         // audio thread is delayed for even a moment.
-        val minBufSize = (AudioRecord.getMinBufferSize(sampleRate, CHANNEL_IN, ENCODING) * 2)
-            .coerceAtLeast(config.frameSize * 2 * 8)
+        val minBufSize = bufferBytes(
+            AudioRecord.getMinBufferSize(sampleRate, CHANNEL_IN, ENCODING), config
+        )
 
-        val recordBuilder = AudioRecord.Builder()
-            .setAudioSource(MediaRecorder.AudioSource.MIC)
+        fun buildRecord(source: Int) = AudioRecord.Builder()
+            .setAudioSource(source)
             .setAudioFormat(
                 AudioFormat.Builder()
                     .setSampleRate(sampleRate)
@@ -346,15 +351,26 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
                     .build()
             )
             .setBufferSizeInBytes(minBufSize)
-        val record = recordBuilder.build()
+            .build()
+
+        // Raw mode prefers the unprocessed microphone, which skips the phone's own automatic
+        // gain and noise handling (the usual reason a phone microphone sounds "squashed").
+        val record = if (config.rawMode) {
+            runCatching { buildRecord(MediaRecorder.AudioSource.UNPROCESSED) }.getOrNull()
+                ?.takeIf { it.state == AudioRecord.STATE_INITIALIZED }
+                ?: buildRecord(MediaRecorder.AudioSource.MIC)
+        } else {
+            buildRecord(MediaRecorder.AudioSource.MIC)
+        }
 
         if (record.state != AudioRecord.STATE_INITIALIZED) {
             record.release()
             throw IllegalStateException("AudioRecord failed to initialise (state=${record.state})")
         }
 
-        val outMinBufSize = (AudioTrack.getMinBufferSize(sampleRate, CHANNEL_OUT, ENCODING) * 2)
-            .coerceAtLeast(config.frameSize * 2 * 8)
+        val outMinBufSize = bufferBytes(
+            AudioTrack.getMinBufferSize(sampleRate, CHANNEL_OUT, ENCODING), config
+        )
 
         val trackBuilder = AudioTrack.Builder()
             .setAudioAttributes(buildOutputAttributes(config))
@@ -380,6 +396,16 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
 
         audioRecord = record
         audioTrack = track
+    }
+
+    /**
+     * Size in bytes for a system audio buffer: never below what the system needs, and otherwise
+     * [AudioConfig.bufferFrames] frames. Big buffers mean fewer dropouts but more delay.
+     */
+    private fun bufferBytes(systemMinBytes: Int, config: AudioConfig): Int {
+        val wanted = config.frameSize * 2 * config.bufferFrames
+        val system = if (config.bufferFrames >= 8) systemMinBytes * 2 else systemMinBytes
+        return maxOf(system, wanted)
     }
 
     /**
@@ -423,7 +449,8 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
         adaptiveCurrentGainDb = 0f
 
         // Start the output with a little silence so it does not run dry (and crackle) at the start.
-        track.write(ShortArray(frameSize * PREFILL_FRAMES), 0, frameSize * PREFILL_FRAMES)
+        val prefill = frameSize * config.prefillFrames
+        if (prefill > 0) track.write(ShortArray(prefill), 0, prefill)
         limiterGain = 1f
         record.startRecording()
         track.play()
@@ -434,6 +461,24 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
                 // 1. Capture a frame from the microphone
                 val readCount = record.read(buffer, 0, frameSize)
                 if (readCount <= 0) continue   // skip empty/error reads
+
+                // Raw mode: the microphone sound goes to the output with only the gain applied.
+                if (config.rawMode) {
+                    var raw: ShortArray = buffer.copyOf(readCount)
+                    synchronized(processingStages) {
+                        for (stage in processingStages) {
+                            // Listen-only stages (the sound recogniser) keep running; they do not
+                            // change the sound.
+                            if (stage.isEnabled && stage.runsInRawMode) {
+                                stage.process(raw, sampleRate, channelCount)
+                            }
+                        }
+                    }
+                    raw = applyRawGain(raw)
+                    lastOutputSplDb = computeSplDb(raw)
+                    track.write(raw, 0, raw.size)
+                    continue
+                }
 
                 // 2. Adaptive amplification loop (Requirement 6.1 – 6.4)
                 if (adaptiveModeEnabled) {
@@ -536,6 +581,17 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
         return samples
     }
 
+    /**
+     * Raw mode gain: plain multiplication by the chosen gain, nothing else. Samples that would go
+     * past full scale are cut at full scale. The loudness warning still fires when the level is
+     * above the 85 dB reference, but the sound is not turned down, so keep the gain moderate.
+     */
+    private fun applyRawGain(samples: ShortArray): ShortArray {
+        val gain = gainLinear
+        if (computeRms(samples) * gain > spl85RmsThreshold) _loudnessWarning.tryEmit(Unit)
+        return applyPlainGain(samples, gain)
+    }
+
     /** Compute the RMS amplitude of [samples]. */
     private fun computeRms(samples: ShortArray): Float {
         if (samples.isEmpty()) return 0f
@@ -565,4 +621,13 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
         runCatching { audioTrack?.release() }
         audioTrack = null
     }
+}
+
+/** Multiplies every sample by [gain], cutting at the 16-bit limits. Returns [samples] changed in place. */
+internal fun applyPlainGain(samples: ShortArray, gain: Float): ShortArray {
+    for (i in samples.indices) {
+        samples[i] = (samples[i] * gain).toInt()
+            .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+    }
+    return samples
 }

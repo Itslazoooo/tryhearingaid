@@ -54,6 +54,9 @@ class SoundClassifierTap(
 
     override val isEnabled: Boolean get() = enabled
 
+    /** The tap never changes the sound, so it keeps listening in raw mode. */
+    override val runsInRawMode: Boolean get() = true
+
     override fun setEnabled(enabled: Boolean) {
         this.enabled = enabled
     }

@@ -123,6 +123,8 @@ class DataStorePreferencesRepository(
         val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
         val PRIVACY_AUDIO_UPLOAD_CONSENT = booleanPreferencesKey("privacy_audio_upload_consent")
         val SOS_CONTACTS = stringPreferencesKey("sos_contacts")
+        val AUDIO_RAW_MODE = booleanPreferencesKey("audio_raw_mode")
+        val AUDIO_LATENCY = stringPreferencesKey("audio_latency")
         val AUDIO_SAMPLE_RATE = intPreferencesKey("audio_sample_rate")
         val NOISE_PRESET = stringPreferencesKey("noise_preset")
         val NOISE_STRENGTH = floatPreferencesKey("noise_strength")
@@ -156,6 +158,9 @@ class DataStorePreferencesRepository(
             privacyAudioUploadConsent = prefs[Keys.PRIVACY_AUDIO_UPLOAD_CONSENT] ?: false,
             sosContacts = SosContacts.decode(prefs[Keys.SOS_CONTACTS]),
             audioSettings = AudioSettings(
+                rawMode = prefs[Keys.AUDIO_RAW_MODE] ?: true,
+                latency = runCatching { LatencyMode.valueOf(prefs[Keys.AUDIO_LATENCY] ?: "") }
+                    .getOrDefault(LatencyMode.BALANCED),
                 sampleRate = prefs[Keys.AUDIO_SAMPLE_RATE] ?: AudioSettings.DEFAULT_SAMPLE_RATE,
                 noisePreset = runCatching { EnvironmentPreset.valueOf(prefs[Keys.NOISE_PRESET] ?: "") }
                     .getOrDefault(EnvironmentPreset.DEFAULT),
@@ -214,6 +219,8 @@ class DataStorePreferencesRepository(
     override suspend fun updateAudioSettings(settings: AudioSettings) {
         val clean = settings.sanitized()
         dataStore.edit {
+            it[Keys.AUDIO_RAW_MODE] = clean.rawMode
+            it[Keys.AUDIO_LATENCY] = clean.latency.name
             it[Keys.AUDIO_SAMPLE_RATE] = clean.sampleRate
             it[Keys.NOISE_PRESET] = clean.noisePreset.name
             it[Keys.NOISE_STRENGTH] = clean.noiseStrength

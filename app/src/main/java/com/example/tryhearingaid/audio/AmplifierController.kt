@@ -27,20 +27,20 @@ object AmplifierPolicy {
     /**
      * The amplifier runs only while the user wants it on AND headphones are connected, because
      * through the phone's own speaker the microphone hears the output and howls. When the sample
-     * rate changes while running, the engine restarts at the new rate.
+     * settings (sample rate, latency, raw mode) change while running, the engine restarts.
      */
     fun decide(
         wanted: Boolean,
         headphones: Boolean,
         engineActive: Boolean,
-        configuredRate: Int,
-        runningRate: Int
+        configured: Any,
+        running: Any?
     ): AmplifierAction {
         val shouldRun = wanted && headphones
         return when {
             shouldRun && !engineActive -> AmplifierAction.START
             !shouldRun && engineActive -> AmplifierAction.STOP
-            shouldRun && engineActive && configuredRate != runningRate -> AmplifierAction.RESTART
+            shouldRun && engineActive && configured != running -> AmplifierAction.RESTART
             else -> AmplifierAction.NONE
         }
     }
@@ -60,7 +60,7 @@ class AmplifierController @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var job: Job? = null
-    private var runningRate = 0
+    private var runningConfig: AudioConfig? = null
 
     private val _wanted = MutableStateFlow(true)
 
@@ -90,8 +90,8 @@ class AmplifierController @Inject constructor(
                 settings.collect { applyToStages(it) }
             }
             combine(_wanted, headphones.isConnected, settings) { wanted, plugged, s ->
-                Triple(wanted, plugged, s.sampleRate)
-            }.collect { (wanted, plugged, rate) -> reconcile(wanted, plugged, rate) }
+                Triple(wanted, plugged, s.toAudioConfig())
+            }.collect { (wanted, plugged, config) -> reconcile(wanted, plugged, config) }
         }
     }
 
@@ -100,7 +100,7 @@ class AmplifierController @Inject constructor(
         job?.cancel()
         job = null
         engine.stop()
-        runningRate = 0
+        runningConfig = null
     }
 
     private fun applyToStages(s: AudioSettings) {
@@ -109,28 +109,28 @@ class AmplifierController @Inject constructor(
         voiceIsolator.setStrength(if (s.voiceFocusEnabled) s.voiceFocusStrength else 0f)
     }
 
-    private suspend fun reconcile(wanted: Boolean, plugged: Boolean, rate: Int) {
+    private suspend fun reconcile(wanted: Boolean, plugged: Boolean, config: AudioConfig) {
         val active = engine.state.value == AudioEngineState.RUNNING ||
             engine.state.value == AudioEngineState.STARTING
-        when (AmplifierPolicy.decide(wanted, plugged, active, rate, runningRate)) {
-            AmplifierAction.START -> startEngine(rate)
+        when (AmplifierPolicy.decide(wanted, plugged, active, config, runningConfig)) {
+            AmplifierAction.START -> startEngine(config)
             AmplifierAction.STOP -> {
                 engine.stop()
-                runningRate = 0
+                runningConfig = null
             }
             AmplifierAction.RESTART -> {
                 engine.stop()
-                runningRate = 0
+                runningConfig = null
                 delay(RESTART_PAUSE_MS) // let the old audio thread finish before reopening the mic
-                startEngine(rate)
+                startEngine(config)
             }
             AmplifierAction.NONE -> Unit
         }
     }
 
-    private fun startEngine(rate: Int) {
-        runningRate = rate
-        engine.start(AudioConfig(sampleRate = rate, frameSize = rate / 100))
+    private fun startEngine(config: AudioConfig) {
+        runningConfig = config
+        engine.start(config)
     }
 
     private companion object {

@@ -24,7 +24,17 @@ data class AudioConfig(
     val sampleRate: Int = 16_000,
     val channelCount: Int = 1,
     val frameSize: Int = 160,           // 10 ms at 16 kHz
-    val outputDevice: AudioDevice = AudioDevice.Default
+    val outputDevice: AudioDevice = AudioDevice.Default,
+    /** Silent frames queued before playback starts. More means more delay but fewer dropouts. */
+    val prefillFrames: Int = 3,
+    /** How many frames the system audio buffers hold. More means more delay but fewer dropouts. */
+    val bufferFrames: Int = 8,
+    /**
+     * Raw mode: the microphone sound goes straight to the output with only the gain applied.
+     * No noise reduction, voice focus, equalizer, adaptive gain or loudness limiter (the sound
+     * recogniser still listens, without changing the sound).
+     */
+    val rawMode: Boolean = false
 )
 
 // ─── AudioEngineState ─────────────────────────────────────────────────────────
@@ -44,6 +54,12 @@ interface AudioProcessingStage {
 
     /** Whether this stage is currently active. Disabled stages pass audio through unchanged. */
     val isEnabled: Boolean
+
+    /**
+     * True for stages that only listen and never change the sound. They keep running in the
+     * amplifier's raw mode; every other stage is skipped there.
+     */
+    val runsInRawMode: Boolean get() = false
 
     /**
      * Process [buffer] in-place (or return a new array) given [sampleRate] and [channelCount].
