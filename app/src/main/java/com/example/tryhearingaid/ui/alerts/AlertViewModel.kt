@@ -111,6 +111,17 @@ sealed class AlertIntent {
     data class SaveSosContacts(val numbers: List<String>) : AlertIntent()
 }
 
+// ─── Dependencies ─────────────────────────────────────────────────────────────
+
+/** Everything [AlertViewModel] needs in the running app, bundled so Hilt can supply it in one go. */
+class AlertDependencies @Inject constructor(
+    val sosController: SosController,
+    val narrationController: NarrationController,
+    val preferences: PreferencesRepository,
+    val soundClassifier: SoundClassifier,
+    val emergencyDetector: EmergencyDetector
+)
+
 // ─── ViewModel ────────────────────────────────────────────────────────────────
 
 /**
@@ -130,13 +141,27 @@ sealed class AlertIntent {
  * - without [soundClassifier] / [emergencyDetector] no live detections or emergencies arrive.
  */
 @HiltViewModel
-class AlertViewModel @Inject constructor(
+class AlertViewModel(
     private val sosController: SosController? = null,
     private val narrationController: NarrationController? = null,
     private val preferences: PreferencesRepository? = null,
     soundClassifier: SoundClassifier? = null,
     emergencyDetector: EmergencyDetector? = null
 ) : ViewModel() {
+
+    /**
+     * The constructor Hilt uses. It is separate from the main one on purpose: when every
+     * parameter of a constructor has a default value, Kotlin also generates a no-argument
+     * version that copies `@Inject`, and Hilt then finds two injection constructors and fails.
+     */
+    @Inject
+    constructor(dependencies: AlertDependencies) : this(
+        sosController = dependencies.sosController,
+        narrationController = dependencies.narrationController,
+        preferences = dependencies.preferences,
+        soundClassifier = dependencies.soundClassifier,
+        emergencyDetector = dependencies.emergencyDetector
+    )
 
     companion object {
         /** Maximum number of recent detections shown in the feed. */
