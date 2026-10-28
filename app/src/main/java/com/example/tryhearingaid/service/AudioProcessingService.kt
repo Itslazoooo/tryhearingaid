@@ -178,6 +178,10 @@ class AudioProcessingService : Service() {
     @Inject
     lateinit var amplifierController: com.example.tryhearingaid.audio.AmplifierController
 
+    /** Shows emergency sounds as a full-screen alert that wakes the screen. */
+    @Inject
+    lateinit var emergencyAlertNotifier: com.example.tryhearingaid.emergency.EmergencyAlertNotifier
+
     @Inject
     lateinit var wearableBridge: WearableBridgeImpl
 
@@ -366,6 +370,8 @@ class AudioProcessingService : Service() {
         // doing (Requirement 10.6).
         serviceScope.launch {
             emergencyDetector.emergencyEvents.collect { event ->
+                // First, so the screen wakes at once (Requirement 10.2).
+                emergencyAlertNotifier.show(event)
                 try {
                     wearableBridge.sendAlert(
                         SoundAlert(

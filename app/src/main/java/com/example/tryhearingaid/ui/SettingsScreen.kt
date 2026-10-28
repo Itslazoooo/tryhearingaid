@@ -1,6 +1,8 @@
 package com.example.tryhearingaid.ui
 
+import android.app.NotificationManager
 import android.content.Intent
+import android.os.Build
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
@@ -57,6 +59,27 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             checked = state.cloudAiEnabled,
             onChange = viewModel::setCloudAiEnabled
         )
+
+        if (Build.VERSION.SDK_INT >= 34) {
+            val manager = context.getSystemService(NotificationManager::class.java)
+            if (!manager.canUseFullScreenIntent()) {
+                Text(
+                    "Emergency alerts cannot wake the screen yet. Allow full-screen alerts for " +
+                        "this app so a fire alarm lights up a locked phone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Button(
+                    onClick = {
+                        context.startActivity(
+                            Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
+                                .setData(Uri.fromParts("package", context.packageName, null))
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Allow full-screen alerts") }
+            }
+        }
 
         OutlinedButton(
             onClick = {
