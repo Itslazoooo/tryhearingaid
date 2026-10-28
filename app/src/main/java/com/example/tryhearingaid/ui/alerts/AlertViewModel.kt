@@ -6,6 +6,7 @@ import com.example.tryhearingaid.classification.AlertSettings
 import com.example.tryhearingaid.classification.EmergencyDetector
 import com.example.tryhearingaid.classification.SoundClassifier
 import com.example.tryhearingaid.data.AlertChannel
+import com.example.tryhearingaid.data.DefaultAlerts
 import com.example.tryhearingaid.data.EmergencyEvent
 import com.example.tryhearingaid.data.FlashlightPattern
 import com.example.tryhearingaid.data.PreferencesRepository
@@ -65,7 +66,7 @@ sealed class SosStatus {
  *   null when no emergency is in progress or after the user dismisses it.
  */
 data class AlertUiState(
-    val enabledCategories: Set<SoundCategory> = SoundCategory.entries.toSet(),
+    val enabledCategories: Set<SoundCategory> = DefaultAlerts.CATEGORIES,
     val alertChannels: Set<AlertChannel> = setOf(AlertChannel.SCREEN_BANNER, AlertChannel.VIBRATION),
     val flashlightPattern: FlashlightPattern = FlashlightPattern.SHORT,
     val recentDetections: List<SoundDetection> = emptyList(),

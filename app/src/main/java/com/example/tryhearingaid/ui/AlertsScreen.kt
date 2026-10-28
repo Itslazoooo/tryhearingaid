@@ -1,5 +1,18 @@
 package com.example.tryhearingaid.ui
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import com.example.tryhearingaid.ui.alerts.SosStatus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -145,7 +158,16 @@ fun AlertsScreenContent(
 
         Divider()
 
-        // ── 4. Recent detections feed ─────────────────────────────────────────
+        // ── 4. Emergency SOS and awareness mode ───────────────────────────────
+        SosSection(uiState = uiState, onIntent = onIntent)
+
+        Divider()
+
+        AwarenessSection(uiState = uiState, onIntent = onIntent)
+
+        Divider()
+
+        // ── 5. Recent detections feed ─────────────────────────────────────────
         SectionHeader(title = "Recent Detections")
         if (uiState.recentDetections.isEmpty()) {
             Text(
@@ -620,5 +642,196 @@ private fun EmergencyOverlayPreview() {
             ),
             onDismiss = {}
         )
+    }
+}
+
+// ─── Emergency SOS ────────────────────────────────────────────────────────────
+
+private val SOS_PERMISSIONS = arrayOf(
+    Manifest.permission.SEND_SMS,
+    Manifest.permission.ACCESS_FINE_LOCATION
+)
+
+private fun hasSmsPermission(context: android.content.Context) =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) ==
+        PackageManager.PERMISSION_GRANTED
+
+@Composable
+private fun SosSection(uiState: AlertUiState, onIntent: (AlertIntent) -> Unit) {
+    val context = LocalContext.current
+    var editing by remember { mutableStateOf(false) }
+    var permissionDenied by remember { mutableStateOf(false) }
+    var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    // The text-message permission is asked for the first time contacts are saved or SOS is used.
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val smsGranted = results[Manifest.permission.SEND_SMS] == true || hasSmsPermission(context)
+        permissionDenied = !smsGranted
+        if (smsGranted) pendingAction?.invoke()
+        pendingAction = null
+    }
+
+    fun withSmsPermission(action: () -> Unit) {
+        if (hasSmsPermission(context)) {
+            permissionDenied = false
+            action()
+        } else {
+            pendingAction = action
+            launcher.launch(SOS_PERMISSIONS)
+        }
+    }
+
+    SectionHeader(title = "Emergency SOS")
+    Text(
+        text = if (uiState.sosContacts.isEmpty()) {
+            "No emergency contacts yet. Add up to 5 numbers; SOS texts them your location."
+        } else {
+            "SOS will text: " + uiState.sosContacts.joinToString(", ")
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+
+    Button(
+        onClick = { withSmsPermission { onIntent(AlertIntent.TriggerSos) } },
+        enabled = uiState.sosStatus !is SosStatus.Sending,
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+        modifier = Modifier.fillMaxWidth().height(64.dp)
+    ) {
+        Text("SOS — send my location", style = MaterialTheme.typography.titleMedium)
+    }
+
+    TextButton(onClick = { editing = true }) { Text("Edit emergency contacts") }
+
+    if (permissionDenied) {
+        Text(
+            text = "SOS cannot send text messages without the SMS permission. " +
+                "Allow it in the app's system settings.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error
+        )
+    }
+
+    SosStatusMessage(
+        status = uiState.sosStatus,
+        onDismiss = { onIntent(AlertIntent.DismissSosStatus) },
+        onDial = { number ->
+            context.startActivity(
+                Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+    )
+
+    if (editing) {
+        ContactsDialog(
+            current = uiState.sosContacts,
+            onSave = { numbers ->
+                editing = false
+                onIntent(AlertIntent.SaveSosContacts(numbers))
+                if (numbers.isNotEmpty()) withSmsPermission { }
+            },
+            onCancel = { editing = false }
+        )
+    }
+}
+
+@Composable
+private fun SosStatusMessage(
+    status: SosStatus,
+    onDismiss: () -> Unit,
+    onDial: (String) -> Unit
+) {
+    val message: String
+    var dialNumbers: List<String> = emptyList()
+    when (status) {
+        SosStatus.Idle -> return
+        SosStatus.Sending -> {
+            Text("Sending SOS…", style = MaterialTheme.typography.bodyMedium)
+            return
+        }
+        SosStatus.NoContacts -> message = "Nothing was sent: add an emergency contact first."
+        is SosStatus.Sent -> message = "SOS sent to ${status.count} contact(s)."
+        is SosStatus.PartlyFailed -> {
+            message = "SOS reached ${status.sent} contact(s), but not: ${status.failed.joinToString(", ")}."
+            dialNumbers = status.failed
+        }
+        is SosStatus.AllFailed -> {
+            message = "SOS could not be sent. Call a contact now."
+            dialNumbers = status.failed
+        }
+        is SosStatus.Error -> message = status.message
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(message, style = MaterialTheme.typography.bodyMedium)
+            dialNumbers.forEach { number ->
+                TextButton(onClick = { onDial(number) }) { Text("Call $number") }
+            }
+            TextButton(onClick = onDismiss) { Text("OK") }
+        }
+    }
+}
+
+@Composable
+private fun ContactsDialog(
+    current: List<String>,
+    onSave: (List<String>) -> Unit,
+    onCancel: () -> Unit
+) {
+    var text by remember { mutableStateOf(current.joinToString("\n")) }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Emergency contacts") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("One phone number per line (max 5)") },
+                minLines = 3
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(text.lines()) }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } }
+    )
+}
+
+// ─── Awareness mode ───────────────────────────────────────────────────────────
+
+@Composable
+private fun AwarenessSection(uiState: AlertUiState, onIntent: (AlertIntent) -> Unit) {
+    SectionHeader(title = "Awareness Mode")
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = "Describe sounds around me (read aloud if text-to-speech is on in Settings).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Switch(
+            checked = uiState.awarenessEnabled,
+            onCheckedChange = { onIntent(AlertIntent.SetAwareness(it)) }
+        )
+    }
+    if (uiState.awarenessEnabled) {
+        if (uiState.descriptionCards.isEmpty()) {
+            Text(
+                "Listening… descriptions will appear here.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        uiState.descriptionCards.forEach { card ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = if (card.count > 1) "${card.text} (×${card.count})" else card.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+        }
     }
 }

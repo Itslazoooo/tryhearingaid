@@ -120,11 +120,13 @@ class DataStorePreferencesRepository(
 
     // -- Default sets (computed once) ----------------------------------------
 
+    // A short first-run list so the phone is not alerting for every bird and voice. Life-safety
+    // sounds are always listened for regardless (see AlertSettings.classifierCategories).
     private val defaultSoundCategories: Set<String> =
-        SoundCategory.entries.map { it.name }.toSet()
+        DefaultAlerts.CATEGORIES.map { it.name }.toSet()
 
     private val defaultAlertChannels: Set<String> =
-        AlertChannel.entries.map { it.name }.toSet()
+        setOf(AlertChannel.SCREEN_BANNER, AlertChannel.VIBRATION).map { it.name }.toSet()
 
     // -- Flow ----------------------------------------------------------------
 
@@ -250,4 +252,12 @@ class InMemoryPreferencesRepository : PreferencesRepository {
     override suspend fun clearAll() {
         _state.value = UserPreferences()
     }
+}
+
+/** First-run alert settings shared by the saved preferences and the Alerts screen. */
+object DefaultAlerts {
+    val CATEGORIES: Set<SoundCategory> = setOf(
+        SoundCategory.DOORBELL, SoundCategory.KNOCK, SoundCategory.BABY_CRYING,
+        SoundCategory.FIRE_ALARM, SoundCategory.SMOKE_ALARM, SoundCategory.CO_ALARM
+    )
 }

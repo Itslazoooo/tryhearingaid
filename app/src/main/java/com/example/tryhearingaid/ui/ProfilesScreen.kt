@@ -59,7 +59,7 @@ import com.example.tryhearingaid.profiles.ProfileViewModel
  * Validates: Requirements 12.1, 5.1, 5.2
  */
 @Composable
-fun ProfilesScreen(viewModel: ProfileViewModel) {
+fun ProfilesScreen(viewModel: ProfileViewModel = androidx.hilt.navigation.compose.hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
 
     // Dialog visibility state

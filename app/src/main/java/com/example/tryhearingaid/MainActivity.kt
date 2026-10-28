@@ -8,6 +8,19 @@ import android.os.Bundle
 import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import dagger.hilt.android.AndroidEntryPoint
+import com.example.tryhearingaid.ui.AlertsScreen
+import com.example.tryhearingaid.ui.AnalyticsScreen
+import com.example.tryhearingaid.ui.CaptionsScreen
+import com.example.tryhearingaid.ui.ProfilesScreen
+import com.example.tryhearingaid.ui.SettingsScreen
+import com.example.tryhearingaid.ui.permissions.PermissionRationaleScreen
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -27,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +52,7 @@ import com.example.tryhearingaid.service.AudioProcessingService
 import com.example.tryhearingaid.ui.AmplifierScreen
 import com.example.tryhearingaid.service.ServiceLocator
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     // ── Service binding ───────────────────────────────────────────────────────
@@ -57,7 +72,6 @@ class MainActivity : ComponentActivity() {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
             val binder = service as AudioProcessingService.LocalBinder
             ServiceLocator.onServiceConnected(binder.getService())
-            isBound = true
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
@@ -72,24 +86,41 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Start the foreground service so it keeps running even when unbound.
-        // The service will create its notification and begin audio capture.
-        val serviceIntent = Intent(this, AudioProcessingService::class.java)
-        startForegroundService(serviceIntent)
-
         setContent {
             MaterialTheme {
-                MainAppScreen()
+                var micGranted by remember { mutableStateOf(hasMicPermission()) }
+                if (micGranted) {
+                    // The microphone foreground service can only start once the permission is granted.
+                    LaunchedEffect(Unit) { startAndBindService() }
+                    MainAppScreen()
+                } else {
+                    PermissionRationaleScreen(onAllRequiredGranted = {
+                        micGranted = hasMicPermission()
+                    })
+                }
             }
+        }
+    }
+
+    private fun hasMicPermission() =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+
+    /** Starts the foreground service (so it keeps running in the background) and binds to it. */
+    private fun startAndBindService() {
+        if (!hasMicPermission()) return
+        val serviceIntent = Intent(this, AudioProcessingService::class.java)
+        startForegroundService(serviceIntent)
+        if (!isBound) {
+            isBound = bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
         }
     }
 
     override fun onStart() {
         super.onStart()
-        // Bind to the (already-started) service so we can interact with it while
-        // the Activity is in the foreground.
-        val serviceIntent = Intent(this, AudioProcessingService::class.java)
-        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+        // Re-bind when coming back to the foreground (the first launch is handled in setContent,
+        // after the microphone permission has been granted).
+        if (hasMicPermission()) startAndBindService()
     }
 
     override fun onStop() {
@@ -109,7 +140,9 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     object Amplifier : Screen("amplifier", "Amplifier", Icons.Default.Hearing)
     object Captions  : Screen("captions",  "Live Text",  Icons.Default.Message)
     object Alerts    : Screen("alerts",    "Alerts",     Icons.Default.NotificationsActive)
+    object Profiles  : Screen("profiles",  "Profiles",   Icons.Default.Person)
     object Analytics : Screen("analytics", "Analytics",  Icons.Default.Timeline)
+    object Settings  : Screen("settings",  "Settings",   Icons.Default.Settings)
 }
 
 // ── Top-level composable ──────────────────────────────────────────────────────
@@ -117,8 +150,12 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppScreen() {
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.Amplifier) }
-    val items = listOf(Screen.Amplifier, Screen.Captions, Screen.Alerts, Screen.Analytics)
+    val items = listOf(
+        Screen.Amplifier, Screen.Captions, Screen.Alerts,
+        Screen.Profiles, Screen.Analytics, Screen.Settings
+    )
+    var currentRoute by rememberSaveable { mutableStateOf(Screen.Amplifier.route) }
+    val currentScreen = items.firstOrNull { it.route == currentRoute } ?: Screen.Amplifier
 
     Scaffold(
         topBar = {
@@ -137,7 +174,7 @@ fun MainAppScreen() {
                         icon    = { Icon(screen.icon, contentDescription = screen.title) },
                         label   = { Text(screen.title) },
                         selected = currentScreen == screen,
-                        onClick  = { currentScreen = screen }
+                        onClick  = { currentRoute = screen.route }
                     )
                 }
             }
@@ -146,9 +183,11 @@ fun MainAppScreen() {
         Surface(modifier = Modifier.padding(innerPadding)) {
             when (currentScreen) {
                 is Screen.Amplifier -> AmplifierScreen()
-                is Screen.Captions  -> PlaceholderScreen("Live Captions & AI Assistant (Feature 2, 4, 7)")
-                is Screen.Alerts    -> PlaceholderScreen("Sound Recognition & Emergency (Feature 3, 6, 9)")
-                is Screen.Analytics -> PlaceholderScreen("Hearing Health Dashboard (Feature 5)")
+                is Screen.Captions  -> CaptionsScreen()
+                is Screen.Alerts    -> AlertsScreen()
+                is Screen.Profiles  -> ProfilesScreen()
+                is Screen.Analytics -> AnalyticsScreen()
+                is Screen.Settings  -> SettingsScreen()
             }
         }
     }
