@@ -40,6 +40,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.tryhearingaid.ui.permissions.PermissionUiEvent
+import com.example.tryhearingaid.ui.permissions.PermissionsViewModel
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -150,14 +160,17 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppScreen() {
+    val snackbarHostState = remember { SnackbarHostState() }
     val items = listOf(
         Screen.Amplifier, Screen.Captions, Screen.Alerts,
         Screen.Profiles, Screen.Analytics, Screen.Settings
     )
+    PermissionWatcher(snackbarHostState)
     var currentRoute by rememberSaveable { mutableStateOf(Screen.Amplifier.route) }
     val currentScreen = items.firstOrNull { it.route == currentRoute } ?: Screen.Amplifier
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(currentScreen.title) },
@@ -188,6 +201,41 @@ fun MainAppScreen() {
                 is Screen.Profiles  -> ProfilesScreen()
                 is Screen.Analytics -> AnalyticsScreen()
                 is Screen.Settings  -> SettingsScreen()
+            }
+        }
+    }
+}
+
+/**
+ * Re-checks the runtime permissions each time the app comes to the foreground and tells the user
+ * which features stopped working if one was switched off in system settings (Requirement 16.3).
+ */
+@Composable
+private fun PermissionWatcher(snackbarHostState: SnackbarHostState) {
+    val context = LocalContext.current
+    val viewModel: PermissionsViewModel = hiltViewModel()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refresh { permission ->
+                    ContextCompat.checkSelfPermission(context, permission) ==
+                        PackageManager.PERMISSION_GRANTED
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            if (event is PermissionUiEvent.PermissionRevoked) {
+                snackbarHostState.showSnackbar(
+                    "A permission was turned off. Not available now: " +
+                        event.affectedFeatures.joinToString(", ")
+                )
             }
         }
     }

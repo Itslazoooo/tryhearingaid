@@ -2,9 +2,11 @@ package com.example.tryhearingaid.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.tryhearingaid.data.BluetoothDeviceInfo
 import com.example.tryhearingaid.data.DataRepository
 import com.example.tryhearingaid.data.PreferencesRepository
 import com.example.tryhearingaid.profiles.ProfileManager
+import com.example.tryhearingaid.wearable.WearableBridge
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,8 +29,12 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     private val preferences: PreferencesRepository,
     private val dataRepository: DataRepository,
-    private val profileManager: ProfileManager
+    private val profileManager: ProfileManager,
+    bridge: WearableBridge
 ) : ViewModel() {
+
+    /** Connected Bluetooth hearing aids, earbuds and watches, with battery where the device reports it. */
+    val devices: StateFlow<List<BluetoothDeviceInfo>> = bridge.connectedDevices
 
     private val transient = MutableStateFlow(SettingsUiState())
 

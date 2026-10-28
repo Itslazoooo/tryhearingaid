@@ -37,10 +37,14 @@ class SettingsViewModelTest {
         every { profiles } returns MutableStateFlow(emptyList())
     }
 
+    private val bridge = mockk<com.example.tryhearingaid.wearable.WearableBridge>(relaxed = true) {
+        every { connectedDevices } returns MutableStateFlow(emptyList())
+    }
+
     @Test
     fun `text to speech switch is saved`() = runTest {
         val prefs = InMemoryPreferencesRepository()
-        val vm = SettingsViewModel(prefs, mockk(relaxed = true), profileManager)
+        val vm = SettingsViewModel(prefs, mockk(relaxed = true), profileManager, bridge)
 
         vm.setTtsEnabled(true)
 
@@ -51,7 +55,7 @@ class SettingsViewModelTest {
     fun `deleting all data calls the repository and reports success`() = runTest {
         val data = mockk<DataRepository>()
         coEvery { data.deleteAllData() } returns Unit
-        val vm = SettingsViewModel(InMemoryPreferencesRepository(), data, profileManager)
+        val vm = SettingsViewModel(InMemoryPreferencesRepository(), data, profileManager, bridge)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect { } }
 
         vm.deleteAllData()
@@ -66,7 +70,7 @@ class SettingsViewModelTest {
         val data = mockk<DataRepository>()
         coEvery { data.deleteAllData() } throws IllegalStateException("file locked")
         val prefs = InMemoryPreferencesRepository()
-        val vm = SettingsViewModel(prefs, data, profileManager)
+        val vm = SettingsViewModel(prefs, data, profileManager, bridge)
         // The state is only computed while something observes it.
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect { } }
 

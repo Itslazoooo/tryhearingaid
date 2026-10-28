@@ -103,11 +103,11 @@ All Kotlin code lives under `com.example.tryhearingaid`. Property-based tests us
     - **Property 15: EmergencyDetector includes all 6 life-safety categories** — assert monitored set contains `{SMOKE_ALARM, CO_ALARM, FIRE_TRUCK_SIREN, AMBULANCE_SIREN, POLICE_SIREN, VERBAL_HELP}`
     - **Validates: Requirements 9.1, 9.2, 9.4, 9.5, 9.6, 10.1**
 
-- [~] 10. Implement AnalyticsEngine and hearing health dashboard
-  - [~] 10.1 Implement `AnalyticsEngineImpl`: subscribe to SPL measurements from `AudioEngine`; compute NIOSH dose (dose% = 100 × Σ(Cᵢ / Tᵢ), Tᵢ = 8h × 2^((85−Lᵢ)/3)); emit `dailyDosePercent` state flow; emit moderate warning at 50%, high warning at 100%; persist `DailyExposureEntity` records; purge records older than 90 days
-  - [~] 10.2 Implement `generateTrendReport(days = 30)`: query last 30 `DailyExposureEntity` records; compute average daily dose, count of high-risk days, and max peak SPL across window
+- [x] 10. Implement AnalyticsEngine and hearing health dashboard
+  - [x] 10.1 Implement `AnalyticsEngineImpl`: subscribe to SPL measurements from `AudioEngine`; compute NIOSH dose (dose% = 100 × Σ(Cᵢ / Tᵢ), Tᵢ = 8h × 2^((85−Lᵢ)/3)); emit `dailyDosePercent` state flow; emit moderate warning at 50%, high warning at 100%; persist `DailyExposureEntity` records; purge records older than 90 days
+  - [x] 10.2 Implement `generateTrendReport(days = 30)`: query last 30 `DailyExposureEntity` records; compute average daily dose, count of high-risk days, and max peak SPL across window
   - [x] 10.3 Create `AnalyticsViewModel` exposing `StateFlow<AnalyticsDashboard>` and `StateFlow<DoseWarningLevel>`; handle "generate trend report" intent
-  - [~] 10.4 Write unit test: verify dose formula for known SPL/duration pairs; verify moderate warning emitted at 50% and high at 100%; verify trend report includes correct fields
+  - [x] 10.4 Write unit test: verify dose formula for known SPL/duration pairs; verify moderate warning emitted at 50% and high at 100%; verify trend report includes correct fields
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
 
   - [x] 10.5 Write property tests for AnalyticsEngine (Properties 16, 17, 18, 19, 20)
@@ -153,26 +153,26 @@ All Kotlin code lives under `com.example.tryhearingaid`. Property-based tests us
   - [x] 14.4 Write unit test: verify classroom mode atomically enables all three components; verify study notes generated contain all required fields; verify keyword lookup returns surrounding context
   - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6_
 
-- [ ] 15. Implement WearableBridge and Bluetooth integration
+- [x] 15. Implement WearableBridge and Bluetooth integration
   - [x] 15.1 Implement `WearableBridgeImpl`: scan and connect to A2DP/HFP devices via `BluetoothAdapter`; connect to BLE devices via `BluetoothLeScanner`; read battery level via GATT `0x2A19` characteristic (set `batteryPercent = null` on read failure); start 30-s reconnect loop on unexpected disconnection; notify user after timeout
-  - [ ] 15.2 Wire `AudioEngine` to route output to connected A2DP device automatically; wire `NotificationDispatcher.sendAlert` to `WearableBridge.sendAlert` for smartwatch vibration
-  - [-] 15.3 Implement `sendCaptions` to transmit `CaptionSegment.text` to display-capable wearables (`supportsDisplay == true`) only; subscribe to `CaptionViewModel.captions` flow in `AudioProcessingService`
-  - [~] 15.4 Write unit test: verify `batteryPercent` is non-null and in [0, 100] when GATT characteristic present; verify null when absent; verify no caption transmitted to non-display device; verify alert forwarded to smartwatch
+  - [x] 15.2 Wire `AudioEngine` to route output to connected A2DP device automatically; wire `NotificationDispatcher.sendAlert` to `WearableBridge.sendAlert` for smartwatch vibration
+  - [x] 15.3 Implement `sendCaptions` to transmit `CaptionSegment.text` to display-capable wearables (`supportsDisplay == true`) only; subscribe to `CaptionViewModel.captions` flow in `AudioProcessingService`
+  - [x] 15.4 Write unit test: verify `batteryPercent` is non-null and in [0, 100] when GATT characteristic present; verify null when absent; verify no caption transmitted to non-display device; verify alert forwarded to smartwatch
   - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6_
 
-  - [~] 15.5 Write property tests for WearableBridge (Properties 26, 27)
+  - [x] 15.5 Write property tests for WearableBridge (Properties 26, 27)
     - **Property 26: Battery level non-null iff device exposes it** — `Arb.boolean()` for `exposesBattery`; if true, assert `batteryPercent in [0, 100]`; if false, assert `batteryPercent == null`
     - **Property 27: Caption text forwarded only to display-capable wearables** — generate random `supportsDisplay` boolean; assert transmission occurs iff `supportsDisplay == true`
     - **Validates: Requirements 14.5, 14.6**
 
-- [ ] 16. Implement Emergency SOS and spatial sound narration
-  - [~] 16.1 Implement SOS function in `AlertViewModel`: on user activation, retrieve GPS via `FusedLocationProviderClient`; if unavailable, use last-known location with staleness timestamp; compose and send SMS to up to 5 saved contacts via `SmsManager`; retry 3 times on failure; show error if contacts not configured
-  - [~] 16.2 Implement environmental awareness mode in `AlertViewModel`: subscribe to `SoundClassifier.detections`; for each detection call `aiAssistant.describeSound`; maintain a `description queue` (max depth 5, dequeue oldest when full); merge same-category events within 3 s into one card; auto-dismiss cards after 5 s; if TTS enabled, read description via `TextToSpeech`
-  - [~] 16.3 Wire `EmergencyDetector.emergencyEvents` to trigger full-screen `EmergencyAlertDialog` composable within 500 ms; wire to `WearableBridge.sendAlert` for smartwatch emergency regardless of screen state; ensure detector stays active when screen is off by holding `WakeLock` in `AudioProcessingService`
-  - [~] 16.4 Write unit test: verify SOS sends last-known location with staleness note when GPS unavailable; verify no SOS sent when contacts list empty; verify description queue never exceeds 5; verify same-category events within 3 s merged into one card
+- [x] 16. Implement Emergency SOS and spatial sound narration
+  - [x] 16.1 Implement SOS function in `AlertViewModel`: on user activation, retrieve GPS via `FusedLocationProviderClient`; if unavailable, use last-known location with staleness timestamp; compose and send SMS to up to 5 saved contacts via `SmsManager`; retry 3 times on failure; show error if contacts not configured
+  - [x] 16.2 Implement environmental awareness mode in `AlertViewModel`: subscribe to `SoundClassifier.detections`; for each detection call `aiAssistant.describeSound`; maintain a `description queue` (max depth 5, dequeue oldest when full); merge same-category events within 3 s into one card; auto-dismiss cards after 5 s; if TTS enabled, read description via `TextToSpeech`
+  - [x] 16.3 Wire `EmergencyDetector.emergencyEvents` to trigger full-screen `EmergencyAlertDialog` composable within 500 ms; wire to `WearableBridge.sendAlert` for smartwatch emergency regardless of screen state; ensure detector stays active when screen is off by holding `WakeLock` in `AudioProcessingService`
+  - [x] 16.4 Write unit test: verify SOS sends last-known location with staleness note when GPS unavailable; verify no SOS sent when contacts list empty; verify description queue never exceeds 5; verify same-category events within 3 s merged into one card
   - _Requirements: 10.2, 10.3, 10.4, 10.5, 10.6, 15.1, 15.2, 15.3, 15.4, 15.5_
 
-  - [~] 16.5 Write property tests for spatial narration queue (Properties 28, 29, 30)
+  - [x] 16.5 Write property tests for spatial narration queue (Properties 28, 29, 30)
     - **Property 28: Every detected sound event produces a non-empty description** — emit random `SoundDetection` while awareness mode active; assert `describeSound` result is non-empty and contains category name
     - **Property 29: Description queue depth never exceeds 5** — `Arb.int(5, 50)` events; assert queue size is always ≤ 5 after each addition
     - **Property 30: Same-category events within 3 s are merged** — emit two events of same category ≤ 3000 ms apart; assert queue contains exactly one merged card
@@ -181,28 +181,28 @@ All Kotlin code lives under `com.example.tryhearingaid`. Property-based tests us
 - [~] 17. Checkpoint — all backend components wired and tested
   - Ensure all unit and property tests pass. Verify `AudioProcessingService` orchestrates the full pipeline (DirectionalFilter → NoiseReducer → VoiceIsolator → Equalizer → AdaptiveGain → AudioTrack) and publishes state flows consumed by all ViewModels. Ask the user if any questions arise.
 
-- [ ] 18. Build Jetpack Compose UI screens
-  - [~] 18.1 Build `AmplifierScreen`: gain slider (0–40 dB), adaptive amplification toggle, environment preset selector, directional hearing control (direction picker, disabled state for single-mic), loudness warning banner; bind to `AudioViewModel`
-  - [~] 18.2 Build `CaptionsScreen`: scrollable caption list (each segment shows speaker label, text, uncertainty indicator), language selector dropdown, start/stop button, export button with share sheet, classroom mode FAB; bind to `CaptionViewModel`
-  - [~] 18.3 Build `AlertsScreen`: sound category toggle list (enable/disable each of 20+ categories), alert channel checkboxes, flashlight pattern selector, recent detections feed, emergency alert full-screen overlay; bind to `AlertViewModel`
-  - [~] 18.4 Build `AnalyticsScreen`: current SPL gauge, daily dose progress bar with color-coded risk level, 7-day trend `LineChart` (using Compose Canvas or Vico), peak level indicator, "Generate Report" button; bind to `AnalyticsViewModel`
-  - [~] 18.5 Build `ProfilesScreen`: profile list with activate/delete actions, "New Profile" dialog, hearing test flow (tone playback UI with "I can hear it" button per frequency), audiologist recommendation card; bind to `ProfileViewModel`
-  - [~] 18.6 Build `SettingsScreen`: privacy settings (data retention info, "Delete All Data" button), cloud AI opt-in toggle, TTS toggle, Bluetooth device list with battery indicators; bind to `PermissionsViewModel` and `PreferencesRepository`
-  - [~] 18.7 Update `MainActivity` navigation to include all 6 screens (Amplifier, Captions, Alerts, Analytics, Profiles, Settings) with bottom nav bar; add top-level permission gate that shows `PermissionRationaleScreen` on first launch
+- [x] 18. Build Jetpack Compose UI screens
+  - [x] 18.1 Build `AmplifierScreen`: gain slider (0–40 dB), adaptive amplification toggle, environment preset selector, directional hearing control (direction picker, disabled state for single-mic), loudness warning banner; bind to `AudioViewModel`
+  - [x] 18.2 Build `CaptionsScreen`: scrollable caption list (each segment shows speaker label, text, uncertainty indicator), language selector dropdown, start/stop button, export button with share sheet, classroom mode FAB; bind to `CaptionViewModel`
+  - [x] 18.3 Build `AlertsScreen`: sound category toggle list (enable/disable each of 20+ categories), alert channel checkboxes, flashlight pattern selector, recent detections feed, emergency alert full-screen overlay; bind to `AlertViewModel`
+  - [x] 18.4 Build `AnalyticsScreen`: current SPL gauge, daily dose progress bar with color-coded risk level, 7-day trend `LineChart` (using Compose Canvas or Vico), peak level indicator, "Generate Report" button; bind to `AnalyticsViewModel`
+  - [x] 18.5 Build `ProfilesScreen`: profile list with activate/delete actions, "New Profile" dialog, hearing test flow (tone playback UI with "I can hear it" button per frequency), audiologist recommendation card; bind to `ProfileViewModel`
+  - [x] 18.6 Build `SettingsScreen`: privacy settings (data retention info, "Delete All Data" button), cloud AI opt-in toggle, TTS toggle, Bluetooth device list with battery indicators; bind to `PermissionsViewModel` and `PreferencesRepository`
+  - [x] 18.7 Update `MainActivity` navigation to include all 6 screens (Amplifier, Captions, Alerts, Analytics, Profiles, Settings) with bottom nav bar; add top-level permission gate that shows `PermissionRationaleScreen` on first launch
   - _Requirements: 1.1, 1.2, 4.1, 5.1, 5.2, 6.4, 7.1, 7.2, 7.5, 8.2, 9.3, 9.4, 9.5, 11.2, 11.3, 11.4, 12.1, 14.5, 15.2, 15.4, 16.1, 16.4_
 
-- [ ] 19. Implement privacy controls and data deletion
-  - [~] 19.1 Implement `deleteAllData()` in `DataRepository`: run in a single Room transaction deleting all rows from `CaptionSegmentEntity`, `TranscriptSession`, `EqBandEntity`, `AudiogramEntity`, `HearingProfile`, `DailyExposureEntity`, `VocabTermEntity`; then clear all DataStore preferences; complete within 5 s; emit a confirmation event to `SettingsViewModel`
-  - [~] 19.2 Implement runtime permission revocation handling in `PermissionsViewModel`: observe permission state changes via `AppOpsManager` or broadcast receiver; when a permission is revoked, pause dependent features and emit `PermissionRevokedEvent` with affected feature list; display impact message in UI
-  - [~] 19.3 Write unit test: verify all Room tables empty and DataStore cleared after `deleteAllData()`; verify features disabled and message shown on permission revocation
+- [x] 19. Implement privacy controls and data deletion
+  - [x] 19.1 Implement `deleteAllData()` in `DataRepository`: run in a single Room transaction deleting all rows from `CaptionSegmentEntity`, `TranscriptSession`, `EqBandEntity`, `AudiogramEntity`, `HearingProfile`, `DailyExposureEntity`, `VocabTermEntity`; then clear all DataStore preferences; complete within 5 s; emit a confirmation event to `SettingsViewModel`
+  - [x] 19.2 Implement runtime permission revocation handling in `PermissionsViewModel`: observe permission state changes via `AppOpsManager` or broadcast receiver; when a permission is revoked, pause dependent features and emit `PermissionRevokedEvent` with affected feature list; display impact message in UI
+  - [x] 19.3 Write unit test: verify all Room tables empty and DataStore cleared after `deleteAllData()`; verify features disabled and message shown on permission revocation
   - _Requirements: 16.2, 16.3, 16.4, 16.5_
 
-  - [~] 19.4 Write property tests for privacy (Properties 31, 32)
+  - [x] 19.4 Write property tests for privacy (Properties 31, 32)
     - **Property 31: Disabling a permission disables all dependent features** — `Arb.enum<Permission>()`; revoke permission; assert all features depending on it are in disabled state
     - **Property 32: Data deletion leaves no retrievable user data** — insert random records; call `deleteAllData()`; query all stores; assert all return empty/null
     - **Validates: Requirements 16.3, 16.5**
 
-- [~] 20. Wire Hilt dependency injection across all components
+- [x] 20. Wire Hilt dependency injection across all components
   - Create `@Module` classes: `AudioModule` (binds `AudioEngine`, `NoiseReducer`, `VoiceIsolator`, `DirectionalFilter`, `Equalizer`), `ProcessingModule` (binds `CaptionEngine`, `SoundClassifier`, `EmergencyDetector`, `AnalyticsEngine`, `AIAssistant`), `DataModule` (provides `HearingAidDatabase`, all DAOs, `DataRepository`), `WearableModule` (binds `WearableBridge`, `NotificationDispatcher`)
   - Annotate `AudioProcessingService` with `@AndroidEntryPoint`; inject all processing components
   - Annotate all ViewModels with `@HiltViewModel`; inject repositories and service-bound interfaces

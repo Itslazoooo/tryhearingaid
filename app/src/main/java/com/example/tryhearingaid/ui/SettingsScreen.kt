@@ -37,6 +37,7 @@ import com.example.tryhearingaid.ui.settings.SettingsViewModel
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsState()
+    val devices by viewModel.devices.collectAsState()
     val context = LocalContext.current
     var confirmDelete by remember { mutableStateOf(false) }
 
@@ -59,6 +60,24 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             checked = state.cloudAiEnabled,
             onChange = viewModel::setCloudAiEnabled
         )
+
+        Text("Bluetooth devices", style = MaterialTheme.typography.titleMedium)
+        if (devices.isEmpty()) {
+            Text(
+                "No Bluetooth hearing aids, earbuds or watches connected.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        devices.forEach { device ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(device.name.ifBlank { device.address }, modifier = Modifier.weight(1f))
+                Text(
+                    device.batteryPercent?.let { "Battery $it%" } ?: "Battery unknown",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
 
         if (Build.VERSION.SDK_INT >= 34) {
             val manager = context.getSystemService(NotificationManager::class.java)
