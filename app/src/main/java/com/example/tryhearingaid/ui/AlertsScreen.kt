@@ -34,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -62,7 +63,7 @@ import java.util.Locale
  * Satisfies Requirements 9.3, 9.4, 9.5.
  */
 @Composable
-fun AlertsScreen(viewModel: AlertViewModel = AlertViewModel()) {
+fun AlertsScreen(viewModel: AlertViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     AlertsScreenContent(
         uiState = uiState,

@@ -28,9 +28,13 @@ import com.example.tryhearingaid.audio.NoiseReducerImpl
 import com.example.tryhearingaid.audio.SoundClassifierTap
 import com.example.tryhearingaid.audio.VoiceIsolatorImpl
 import com.example.tryhearingaid.captions.CaptionEngine
+import com.example.tryhearingaid.classification.AlertSettings
 import com.example.tryhearingaid.classification.EmergencyDetectorImpl
+import com.example.tryhearingaid.classification.NotificationDispatcher
 import com.example.tryhearingaid.data.AlertPriority
+import com.example.tryhearingaid.data.PreferencesRepository
 import com.example.tryhearingaid.data.SoundAlert
+import com.example.tryhearingaid.data.SoundCategory
 import com.example.tryhearingaid.classification.SoundClassifierImpl
 import com.example.tryhearingaid.wearable.CaptionForwarder
 import com.example.tryhearingaid.wearable.WearableBridgeImpl
@@ -124,6 +128,21 @@ class AudioProcessingService : Service() {
      */
     @Inject
     lateinit var emergencyDetector: EmergencyDetectorImpl
+
+    /** Delivers sound alerts as banner, vibration, flashlight and smartwatch alerts. */
+    @Inject
+    lateinit var notificationDispatcher: NotificationDispatcher
+
+    /** Where the user's alert choices are saved. */
+    @Inject
+    lateinit var preferences: PreferencesRepository
+
+    /**
+     * Sounds the user wants ordinary alerts for. Kept separate from the classifier's own list,
+     * which always also contains the life-safety sounds (see [AlertSettings.classifierCategories]).
+     */
+    @Volatile
+    private var alertCategories: Set<SoundCategory> = SoundCategory.entries.toSet()
 
     /**
      * Partial wake lock held for the whole service lifetime so the CPU keeps running, and the
@@ -235,6 +254,9 @@ class AudioProcessingService : Service() {
         audioEngine.addProcessingStage(voiceIsolator)
         audioEngine.addProcessingStage(equalizer)
 
+        // The classifier starts switched off and ignores audio until it is enabled.
+        soundClassifier.setEnabled(true)
+
         // EmergencyDetector subscribes to SoundClassifier.detections and must
         // remain active for the entire service lifetime (Requirement 10.5).
         emergencyDetector.start()
@@ -242,6 +264,42 @@ class AudioProcessingService : Service() {
         acquireWakeLock()
 
         startWearableIntegration()
+        startAlertIntegration()
+    }
+
+    /**
+     * Connects sound detection to the user's alerts (Requirements 9.2 to 9.6).
+     *
+     * 1. Applies the saved alert settings to the classifier and dispatcher, and again whenever
+     *    the user changes them.
+     * 2. Sends each detected sound the user has enabled to the dispatcher, which decides the
+     *    priority from the confidence and uses the enabled channels. This runs here, in the
+     *    service, so alerts keep arriving with the screen off or the app in the background.
+     */
+    private fun startAlertIntegration() {
+        serviceScope.launch {
+            preferences.userPreferences
+                .map { AlertSettings.from(it) }
+                .distinctUntilChanged()
+                .collect { settings ->
+                    alertCategories = settings.categories
+                    soundClassifier.setEnabledCategories(settings.classifierCategories)
+                    notificationDispatcher.setChannels(settings.channels)
+                    notificationDispatcher.setFlashlightPattern(settings.flashlightPattern)
+                }
+        }
+
+        serviceScope.launch {
+            soundClassifier.detections.collect { detection ->
+                if (detection.category !in alertCategories) return@collect
+                try {
+                    // The priority argument is ignored; the dispatcher derives it from confidence.
+                    notificationDispatcher.dispatch(detection, AlertPriority.LOW)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not dispatch alert for ${detection.category}: ${e.message}")
+                }
+            }
+        }
     }
 
     /** Take the partial wake lock. Does nothing if the device has no [PowerManager]. */
@@ -361,8 +419,9 @@ class AudioProcessingService : Service() {
         // Stop emergency detector before the audio engine so any in-flight
         // detections are cleanly cancelled before pipeline teardown.
         emergencyDetector.stop()
-        // The classifier is shared app-wide and cannot be reopened after close(), so it is left
-        // loaded here and freed when the process ends.
+        // The classifier is shared app-wide and cannot be reopened after close(), so it is only
+        // switched off here (it is switched on again in onCreate) and freed when the process ends.
+        soundClassifier.setEnabled(false)
         audioEngine.stop()
         // Stop following wearable state. The bridge itself is an app-wide singleton
         // shared with the dispatcher, so it is not released here.

@@ -2,15 +2,22 @@ package com.example.tryhearingaid.ui.alerts
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.tryhearingaid.classification.AlertSettings
+import com.example.tryhearingaid.classification.EmergencyDetector
+import com.example.tryhearingaid.classification.SoundClassifier
 import com.example.tryhearingaid.data.AlertChannel
 import com.example.tryhearingaid.data.EmergencyEvent
 import com.example.tryhearingaid.data.FlashlightPattern
+import com.example.tryhearingaid.data.PreferencesRepository
 import com.example.tryhearingaid.data.SoundCategory
 import com.example.tryhearingaid.data.SoundDetection
+import com.example.tryhearingaid.emergency.SosContacts
 import com.example.tryhearingaid.emergency.SosController
 import com.example.tryhearingaid.emergency.SosResult
 import com.example.tryhearingaid.environmental.DescriptionCard
 import com.example.tryhearingaid.environmental.NarrationController
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,6 +71,7 @@ data class AlertUiState(
     val recentDetections: List<SoundDetection> = emptyList(),
     val emergencyEvent: EmergencyEvent? = null,
     val sosStatus: SosStatus = SosStatus.Idle,
+    val sosContacts: List<String> = emptyList(),
     val awarenessEnabled: Boolean = false,
     val descriptionCards: List<DescriptionCard> = emptyList()
 )
@@ -98,6 +106,9 @@ sealed class AlertIntent {
 
     /** Turn environmental awareness (spoken-style sound descriptions) on or off (Requirement 15). */
     data class SetAwareness(val enabled: Boolean) : AlertIntent()
+
+    /** Save the emergency contact numbers (at most 5; blanks and duplicates are removed). */
+    data class SaveSosContacts(val numbers: List<String>) : AlertIntent()
 }
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
@@ -111,13 +122,20 @@ sealed class AlertIntent {
  *
  * Satisfies Requirements 9.3, 9.4, 9.5, 10.3, 10.4, 15.1 to 15.5.
  *
- * Both controllers are optional so the screen can be previewed and tested without Android
- * services. Without [sosController] the SOS button reports an error; without
- * [narrationController] awareness mode shows no cards.
+ * Every dependency is optional so the screen can be previewed and tested without Android
+ * services (Hilt supplies all of them in the running app):
+ * - without [sosController] the SOS button reports an error;
+ * - without [narrationController] awareness mode shows no cards;
+ * - without [preferences] the settings live only in memory;
+ * - without [soundClassifier] / [emergencyDetector] no live detections or emergencies arrive.
  */
-class AlertViewModel(
+@HiltViewModel
+class AlertViewModel @Inject constructor(
     private val sosController: SosController? = null,
-    private val narrationController: NarrationController? = null
+    private val narrationController: NarrationController? = null,
+    private val preferences: PreferencesRepository? = null,
+    soundClassifier: SoundClassifier? = null,
+    emergencyDetector: EmergencyDetector? = null
 ) : ViewModel() {
 
     companion object {
@@ -129,8 +147,39 @@ class AlertViewModel(
     val uiState: StateFlow<AlertUiState> = _uiState.asStateFlow()
 
     init {
-        // Mirror the narration cards into the UI state. Only touches viewModelScope when a
-        // controller was supplied, so plain `AlertViewModel()` keeps working in JVM tests.
+        // Each source below only touches viewModelScope when it was supplied, so plain
+        // `AlertViewModel()` keeps working in JVM tests.
+
+        // Show the saved alert settings, and follow later changes.
+        preferences?.let { saved ->
+            viewModelScope.launch {
+                saved.userPreferences.collect { prefs ->
+                    val settings = AlertSettings.from(prefs)
+                    _uiState.update {
+                        it.copy(
+                            enabledCategories = settings.categories,
+                            alertChannels = settings.channels,
+                            flashlightPattern = settings.flashlightPattern,
+                            sosContacts = prefs.sosContacts
+                        )
+                    }
+                }
+            }
+        }
+
+        // Live detections feed the "recent sounds" list; emergencies raise the overlay.
+        soundClassifier?.let { classifier ->
+            viewModelScope.launch {
+                classifier.detections.collect { handleIntent(AlertIntent.OnDetection(it)) }
+            }
+        }
+        emergencyDetector?.let { detector ->
+            viewModelScope.launch {
+                detector.emergencyEvents.collect { handleIntent(AlertIntent.OnEmergency(it)) }
+            }
+        }
+
+        // Mirror the narration cards into the UI state.
         narrationController?.let { controller ->
             viewModelScope.launch {
                 controller.cards.collect { cards ->
@@ -153,16 +202,19 @@ class AlertViewModel(
                 val current = _uiState.value.enabledCategories.toMutableSet()
                 if (intent.enabled) current.add(intent.category) else current.remove(intent.category)
                 _uiState.value = _uiState.value.copy(enabledCategories = current)
+                persist { updateEnabledSoundCategories(current.mapTo(HashSet()) { it.name }) }
             }
 
             is AlertIntent.ToggleChannel -> {
                 val current = _uiState.value.alertChannels.toMutableSet()
                 if (intent.enabled) current.add(intent.channel) else current.remove(intent.channel)
                 _uiState.value = _uiState.value.copy(alertChannels = current)
+                persist { updateAlertChannels(current.mapTo(HashSet()) { it.name }) }
             }
 
             is AlertIntent.SetFlashlightPattern -> {
                 _uiState.value = _uiState.value.copy(flashlightPattern = intent.pattern)
+                persist { updateFlashlightPattern(intent.pattern.name) }
             }
 
             is AlertIntent.DismissEmergency -> {
@@ -196,7 +248,19 @@ class AlertViewModel(
                 if (intent.enabled) narrationController?.start() else narrationController?.stop()
                 _uiState.update { it.copy(awarenessEnabled = intent.enabled) }
             }
+
+            is AlertIntent.SaveSosContacts -> {
+                val cleaned = SosContacts.normalize(intent.numbers)
+                _uiState.update { it.copy(sosContacts = cleaned) }
+                persist { updateSosContacts(cleaned) }
+            }
         }
+    }
+
+    /** Save a setting. Does nothing when no [preferences] were supplied (previews and tests). */
+    private fun persist(save: suspend PreferencesRepository.() -> Unit) {
+        val repository = preferences ?: return
+        viewModelScope.launch { repository.save() }
     }
 
     private fun triggerSos() {
