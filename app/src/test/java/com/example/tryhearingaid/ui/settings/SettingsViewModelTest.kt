@@ -52,7 +52,7 @@ class SettingsViewModelTest {
         val data = mockk<DataRepository>()
         coEvery { data.deleteAllData() } returns Unit
         val vm = SettingsViewModel(InMemoryPreferencesRepository(), data, profileManager)
-        backgroundScope.launch { vm.uiState.collect { } }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect { } }
 
         vm.deleteAllData()
 
@@ -68,7 +68,7 @@ class SettingsViewModelTest {
         val prefs = InMemoryPreferencesRepository()
         val vm = SettingsViewModel(prefs, data, profileManager)
         // The state is only computed while something observes it.
-        backgroundScope.launch { vm.uiState.collect { } }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect { } }
 
         vm.deleteAllData()
 
