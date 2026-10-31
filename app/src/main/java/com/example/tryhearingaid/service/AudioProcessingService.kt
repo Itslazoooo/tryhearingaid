@@ -182,6 +182,10 @@ class AudioProcessingService : Service() {
     @Inject
     lateinit var emergencyAlertNotifier: com.example.tryhearingaid.emergency.EmergencyAlertNotifier
 
+    /** Offline captions listen to the same audio as the amplifier, so the two never fight over the microphone. */
+    @Inject
+    lateinit var offlineCaptions: com.example.tryhearingaid.captions.VoskCaptionEngine
+
     @Inject
     lateinit var wearableBridge: WearableBridgeImpl
 
@@ -268,6 +272,7 @@ class AudioProcessingService : Service() {
         // (Adaptive gain and AudioTrack output are applied after all stages.)
         // The engine ignores a stage it already has, so a restarted service adds nothing twice.
         audioEngine.addProcessingStage(classifierTap)
+        audioEngine.addProcessingStage(offlineCaptions)
         audioEngine.addProcessingStage(directionalFilter)
         audioEngine.addProcessingStage(noiseReducer)
         audioEngine.addProcessingStage(voiceIsolator)

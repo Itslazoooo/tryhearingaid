@@ -118,6 +118,10 @@ dependencies {
     // Gson (JSON serialization for Room TypeConverters)
     implementation(libs.gson)
 
+    // Offline speech recognition (Vosk). The JNA library must be the aar, as the Vosk project says.
+    implementation("net.java.dev.jna:jna:5.13.0@aar")
+    implementation("com.alphacephei:vosk-android:0.3.47")
+
     // Unit testing
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

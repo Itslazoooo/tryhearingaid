@@ -33,7 +33,7 @@ object CaptionsModule {
 
     @Provides
     @Singleton
-    fun provideCaptionEngine(impl: CaptionEngineImpl): CaptionEngine = impl
+    fun provideCaptionEngine(impl: com.example.tryhearingaid.captions.CompositeCaptionEngine): CaptionEngine = impl
 
     @Provides
     @Singleton

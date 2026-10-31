@@ -29,6 +29,9 @@
     <!-- Vibration for alerts -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Only used to download an offline speech model when the user asks for one. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Lets an emergency sound wake the screen with a full-screen alert (Requirement 10.2). -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
