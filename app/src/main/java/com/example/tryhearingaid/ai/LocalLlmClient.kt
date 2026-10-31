@@ -63,9 +63,6 @@ class LocalLlmClient @Inject constructor(
         val options = LlmInference.LlmInferenceOptions.builder()
             .setModelPath(file.absolutePath)
             .setMaxTokens(LlmCatalog.CONTEXT_TOKENS)
-            .setTopK(40)
-            .setTemperature(0.3f)
-            .setRandomSeed(1)
             .build()
         return LlmInference.createFromOptions(context, options).also {
             engine = it

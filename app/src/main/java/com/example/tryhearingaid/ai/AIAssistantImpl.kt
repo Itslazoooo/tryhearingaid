@@ -187,9 +187,11 @@ $text"""
         var current = text
         var rounds = 0
         while (current.length > maxPromptChars && rounds < 3) {
-            current = TranscriptChunker.chunk(current, maxPromptChars).joinToString("\n") { piece ->
-                executeWithFallback("Summarize the following transcript concisely:\n\n$piece")
+            val summaries = mutableListOf<String>()
+            for (piece in TranscriptChunker.chunk(current, maxPromptChars)) {
+                summaries += executeWithFallback("Summarize the following transcript concisely:\n\n$piece")
             }
+            current = summaries.joinToString("\n")
             rounds++
         }
         return if (current.length > maxPromptChars) current.take(maxPromptChars) else current

@@ -471,11 +471,57 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
         track.play()
         running = true
 
+        // Health readings for the sound diagnostic.
+        val accumulator = DiagnosticsAccumulator()
+        val frameBudgetNs = (frameSizeMs * 1_000_000f).toLong()
+        val micSource = micSourceName(record)
+        val bufferMs = bufferFrameCount(config) * frameSizeMs
+        var readProblems = 0
+        var maxLoad = 0
+        var lastReport = System.nanoTime()
+        var lastUnderruns = 0
+        var frameStart = 0L
+        fun publish() {
+            val now = System.nanoTime()
+            if (now - lastReport < DIAGNOSTIC_INTERVAL_NS) return
+            lastReport = now
+            val window = accumulator.takeWindow()
+            maxLoad = maxOf(maxLoad, window.loadPercent)
+            val underruns = runCatching { track.underrunCount }.getOrDefault(0)
+            val recent = underruns - lastUnderruns
+            lastUnderruns = underruns
+            _diagnostics.value = AudioDiagnostics(
+                running = true,
+                sampleRate = sampleRate,
+                frameMs = frameSizeMs,
+                bufferMs = bufferMs,
+                inputPeakDb = window.inputPeakDb,
+                inputRmsDb = window.inputRmsDb,
+                outputPeakDb = window.outputPeakDb,
+                outputRmsDb = window.outputRmsDb,
+                clippedSamples = window.clippedSamples,
+                readProblems = readProblems,
+                underrunsTotal = underruns,
+                underrunsRecent = recent,
+                loadPercent = window.loadPercent,
+                maxLoadPercent = maxLoad,
+                micSource = micSource,
+                outputDeviceType = runCatching { track.routedDevice?.type }.getOrNull() ?: -1,
+                rawMode = config.rawMode,
+                gainDb = _currentGain.value
+            )
+        }
+
         try {
             while (running) {
                 // 1. Capture a frame from the microphone
                 val readCount = record.read(buffer, 0, frameSize)
-                if (readCount <= 0) continue   // skip empty/error reads
+                if (readCount <= 0) {   // skip empty/error reads
+                    readProblems++
+                    publish()
+                    continue
+                }
+                frameStart = System.nanoTime()
 
                 // Raw mode: the microphone sound goes to the output with only the gain applied.
                 if (config.rawMode) {
