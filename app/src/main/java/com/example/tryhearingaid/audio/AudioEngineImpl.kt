@@ -57,6 +57,9 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
     private val _state = MutableStateFlow(AudioEngineState.IDLE)
     override val state: StateFlow<AudioEngineState> = _state.asStateFlow()
 
+    private val _diagnostics = MutableStateFlow(AudioDiagnostics())
+    override val diagnostics: StateFlow<AudioDiagnostics> = _diagnostics.asStateFlow()
+
     private val _currentGain = MutableStateFlow(0f)
     override val currentGain: Float get() = _currentGain.value
 
@@ -126,6 +129,9 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
 
     companion object {
         private const val TAG = "AudioEngineImpl"
+
+        /** How often the sound diagnostic is refreshed. */
+        private const val DIAGNOSTIC_INTERVAL_NS = 500_000_000L
 
         /** PCM encoding used throughout. */
         private const val ENCODING = AudioFormat.ENCODING_PCM_16BIT
@@ -402,6 +408,15 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
      * Size in bytes for a system audio buffer: never below what the system needs, and otherwise
      * [AudioConfig.bufferFrames] frames. Big buffers mean fewer dropouts but more delay.
      */
+    private fun bufferFrameCount(config: AudioConfig): Int = config.bufferFrames
+
+    private fun micSourceName(record: AudioRecord): String = when (record.audioSource) {
+        MediaRecorder.AudioSource.UNPROCESSED -> "UNPROCESSED"
+        MediaRecorder.AudioSource.MIC -> "MIC"
+        MediaRecorder.AudioSource.VOICE_RECOGNITION -> "VOICE_RECOGNITION"
+        else -> "source ${record.audioSource}"
+    }
+
     private fun bufferBytes(systemMinBytes: Int, config: AudioConfig): Int {
         val wanted = config.frameSize * 2 * config.bufferFrames
         val system = if (config.bufferFrames >= 8) systemMinBytes * 2 else systemMinBytes
@@ -476,7 +491,11 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
                     }
                     raw = applyRawGain(raw)
                     lastOutputSplDb = computeSplDb(raw)
+                    accumulator.onFrame(
+                        buffer, readCount, raw, raw.size, System.nanoTime() - frameStart, frameBudgetNs
+                    )
                     track.write(raw, 0, raw.size)
+                    publish()
                     continue
                 }
 
@@ -536,11 +555,16 @@ class AudioEngineImpl @Inject constructor() : AudioEngine {
 
                 // 5. Update the current SPL measurement
                 lastOutputSplDb = computeSplDb(processed)
+                accumulator.onFrame(
+                    buffer, readCount, processed, processed.size, System.nanoTime() - frameStart, frameBudgetNs
+                )
 
                 // 6. Write to AudioTrack output
                 track.write(processed, 0, processed.size)
+                publish()
             }
         } finally {
+            _diagnostics.value = _diagnostics.value.copy(running = false)
             runCatching { record.stop() }
             runCatching { track.stop() }
         }

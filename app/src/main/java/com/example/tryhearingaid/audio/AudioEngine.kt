@@ -96,6 +96,10 @@ interface AudioEngine {
     /** Live state of this engine. */
     val state: StateFlow<AudioEngineState>
 
+    /** A health reading of the audio, refreshed about twice a second while running. */
+    val diagnostics: StateFlow<AudioDiagnostics>
+        get() = kotlinx.coroutines.flow.MutableStateFlow(AudioDiagnostics())
+
     /**
      * Currently applied gain in dB, always in the range [0, 40].
      * Exposed as a read-only property so callers can inspect the clamped value.

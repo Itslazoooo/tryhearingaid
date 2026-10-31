@@ -6,7 +6,10 @@ import android.media.AudioManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.tryhearingaid.audio.AmplifierController
+import com.example.tryhearingaid.audio.AudioDiagnostics
+import com.example.tryhearingaid.audio.AudioDiagnosticsAdvisor
 import com.example.tryhearingaid.audio.AudioDirection
+import com.example.tryhearingaid.audio.DiagnosticFinding
 import com.example.tryhearingaid.data.AudioSettings
 import com.example.tryhearingaid.data.LatencyMode
 import kotlinx.coroutines.delay
@@ -53,7 +56,11 @@ data class AudioUiState(
     val sampleRate: Int = AudioSettings.DEFAULT_SAMPLE_RATE,
     val noiseStrength: Float = AudioSettings.DEFAULT_STRENGTH,
     val voiceFocusEnabled: Boolean = false,
-    val voiceFocusStrength: Float = AudioSettings.DEFAULT_STRENGTH
+    val voiceFocusStrength: Float = AudioSettings.DEFAULT_STRENGTH,
+    val diagnostics: AudioDiagnostics = AudioDiagnostics(),
+    val findings: List<DiagnosticFinding> = emptyList(),
+    /** Plain text of the diagnostic, to copy and send. */
+    val diagnosticReport: String = ""
 )
 
 // ─── Intents ──────────────────────────────────────────────────────────────────
@@ -131,6 +138,25 @@ class AudioViewModel @Inject constructor(
                     noiseStrength = settings.noiseStrength,
                     voiceFocusEnabled = settings.voiceFocusEnabled,
                     voiceFocusStrength = settings.voiceFocusStrength
+                )
+            }
+        }
+    }
+
+    init {
+        // The sound diagnostic: readings from the engine plus advice in plain words.
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val nativeRate = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
+            ?.toIntOrNull() ?: 0
+        val nativeFrames = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
+            ?.toIntOrNull() ?: 0
+        viewModelScope.launch {
+            audioEngine.diagnostics.collect { d ->
+                val findings = AudioDiagnosticsAdvisor.advise(d, nativeRate, nativeFrames)
+                _uiState.value = _uiState.value.copy(
+                    diagnostics = d,
+                    findings = findings,
+                    diagnosticReport = AudioDiagnosticsAdvisor.report(d, findings, nativeRate, nativeFrames)
                 )
             }
         }

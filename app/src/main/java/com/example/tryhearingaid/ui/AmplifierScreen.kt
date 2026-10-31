@@ -34,7 +34,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import com.example.tryhearingaid.audio.AudioDiagnosticsAdvisor
+import com.example.tryhearingaid.audio.FindingLevel
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -121,12 +125,67 @@ fun AmplifierContent(
         // ── Sound quality: sample rate, noise reduction, voice focus ──────────
         SoundQualityCard(uiState = uiState, onIntent = onIntent)
 
+        // ── Sound diagnostic ──────────────────────────────────────────────────
+        SoundDiagnosticCard(uiState = uiState)
+
         // ── Directional hearing control ───────────────────────────────────────
         DirectionalHearingCard(
             available = uiState.isDirectionalAvailable,
             selected = uiState.directionalDirection,
             onSelect = { onIntent(AudioIntent.SetDirection(it)) }
         )
+    }
+}
+
+// ─── Sound diagnostic ─────────────────────────────────────────────────────────
+
+@Composable
+private fun SoundDiagnosticCard(uiState: AudioUiState) {
+    var open by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    val d = uiState.diagnostics
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Sound diagnostic", style = MaterialTheme.typography.titleMedium)
+                OutlinedButton(onClick = { open = !open }) { Text(if (open) "Hide" else "Show") }
+            }
+            if (open) {
+                Text(
+                    "Check what is wrong with the sound while the amplifier is running.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                uiState.findings.forEach { finding ->
+                    val label = when (finding.level) {
+                        FindingLevel.OK -> "OK"
+                        FindingLevel.INFO -> "Note"
+                        FindingLevel.WARNING -> "Warning"
+                        FindingLevel.PROBLEM -> "Problem"
+                    }
+                    Text("$label: ${finding.text}", style = MaterialTheme.typography.bodyMedium)
+                }
+                if (d.running) {
+                    val line = { v: Float -> String.format(java.util.Locale.US, "%.0f", v) }
+                    Text(
+                        "Input ${line(d.inputRmsDb)} dB (peak ${line(d.inputPeakDb)})\n" +
+                            "Output ${line(d.outputRmsDb)} dB (peak ${line(d.outputPeakDb)})\n" +
+                            "Output device: ${AudioDiagnosticsAdvisor.deviceName(d.outputDeviceType)}\n" +
+                            "Dropouts: ${d.underrunsTotal}   Load: ${d.loadPercent}%",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Button(onClick = { clipboard.setText(AnnotatedString(uiState.diagnosticReport)) }) {
+                    Text("Copy report")
+                }
+            }
+        }
     }
 }
 
