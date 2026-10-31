@@ -81,6 +81,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
 
         OfflineCaptionsSection()
 
+        OfflineAiSection()
+
         if (Build.VERSION.SDK_INT >= 34) {
             val manager = context.getSystemService(NotificationManager::class.java)
             if (!manager.canUseFullScreenIntent()) {

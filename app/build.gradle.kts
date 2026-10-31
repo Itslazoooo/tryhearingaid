@@ -120,6 +120,7 @@ dependencies {
 
     // Offline translation (Google ML Kit). Language packs of about 30 MB are downloaded on request.
     implementation("com.google.mlkit:translate:17.0.3")
+    implementation("com.google.mediapipe:tasks-genai:0.10.24")
 
     // Offline speech recognition (Vosk). The JNA library must be the aar, as the Vosk project says.
     implementation("net.java.dev.jna:jna:5.13.0@aar")

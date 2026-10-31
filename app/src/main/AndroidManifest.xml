@@ -61,6 +61,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TryHearingAid">
 
+        <!-- The offline AI may use the phone's graphics chip when it has one. -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true">

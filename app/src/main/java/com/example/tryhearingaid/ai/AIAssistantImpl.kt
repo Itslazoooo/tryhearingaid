@@ -44,7 +44,14 @@ class AIAssistantImpl(
     private val onDeviceClient: GeminiClient,
     private val vocabularyDao: VocabularyDao,
     private val networkCallback: NetworkCallback,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    /** Time allowed for a summary, translation, definition. A small model on a phone needs longer. */
+    private val shortTimeoutMs: Long = 5_000L,
+    /** Time allowed for study notes. */
+    private val longTimeoutMs: Long = 10_000L,
+    /** The most transcript text one request may carry; longer text is condensed in pieces first. */
+    private val maxPromptChars: Int = Int.MAX_VALUE,
+    private val onDeviceReady: () -> Boolean = { true }
 ) : AIAssistant, NetworkStateListener {
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -55,10 +62,7 @@ class AIAssistantImpl(
     private val _importantPoints = MutableSharedFlow<ImportantPoint>(extraBufferCapacity = 64)
     override val importantPoints: SharedFlow<ImportantPoint> = _importantPoints.asSharedFlow()
 
-    // ── Timeouts (ms) ─────────────────────────────────────────────────────────
-
-    private val shortTimeoutMs = 5_000L
-    private val longTimeoutMs  = 10_000L
+    override fun isOnDeviceReady(): Boolean = onDeviceReady()
 
     // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -81,8 +85,13 @@ class AIAssistantImpl(
     override suspend fun summarize(transcript: List<CaptionSegment>): String =
         withTimeout(shortTimeoutMs) {
             val text = transcript.joinToString(" ") { it.text }
-            val prompt = "Summarize the following transcript concisely:\n\n$text"
-            executeWithFallback(prompt)
+            val body = condense(text)
+            if (body == text) {
+                executeWithFallback("Summarize the following transcript concisely:\n\n$text")
+            } else {
+                // Long transcript: the pieces were summarised; now join those into one summary.
+                executeWithFallback("Summarize the following notes concisely:\n\n$body")
+            }
         }
 
     override suspend fun translate(text: String, targetLanguage: String): String =
@@ -105,7 +114,7 @@ class AIAssistantImpl(
 
     override suspend fun generateStudyNotes(transcript: List<CaptionSegment>): StudyNotes =
         withTimeout(longTimeoutMs) {
-            val text = transcript.joinToString("\n") { "[${it.speakerLabel}] ${it.text}" }
+            val text = condense(transcript.joinToString("\n") { "[${it.speakerLabel}] ${it.text}" })
             val prompt = """Generate structured study notes from the following transcript.
 Format:
 TITLE: <title>
@@ -169,6 +178,22 @@ $text"""
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * Make [text] short enough for one request: when it is too long, summarise it piece by piece
+     * (a few rounds at most) and return what is left. Short text is returned unchanged.
+     */
+    private suspend fun condense(text: String): String {
+        var current = text
+        var rounds = 0
+        while (current.length > maxPromptChars && rounds < 3) {
+            current = TranscriptChunker.chunk(current, maxPromptChars).joinToString("\n") { piece ->
+                executeWithFallback("Summarize the following transcript concisely:\n\n$piece")
+            }
+            rounds++
+        }
+        return if (current.length > maxPromptChars) current.take(maxPromptChars) else current
+    }
 
     /**
      * Execute [prompt] against the appropriate backend.
@@ -275,9 +300,12 @@ $text"""
     private fun parseStudyNotes(response: String, transcript: List<CaptionSegment>): StudyNotes {
         val lines = response.lines()
 
-        fun extractField(prefix: String): String =
-            lines.firstOrNull { it.startsWith(prefix) }
-                ?.removePrefix(prefix)?.trim() ?: ""
+        // Small models often add bullets or bold marks around the labels, so allow for them.
+        fun extractField(prefix: String): String {
+            val line = lines.map { it.trim().trimStart('*', '#', '-', ' ').replace("**", "") }
+                .firstOrNull { it.startsWith(prefix, ignoreCase = true) } ?: return ""
+            return line.substring(prefix.length).trim()
+        }
 
         val title    = extractField("TITLE:").ifEmpty { "Lecture Notes" }
         val topics   = extractField("KEY_TOPICS:").split(",").map { it.trim() }.filter { it.isNotEmpty() }

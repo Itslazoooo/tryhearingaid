@@ -83,7 +83,13 @@ data class CaptionUiState(
     /** Translated text by caption id; a caption without an entry is not translated yet. */
     val translations: Map<UUID, String> = emptyMap(),
     /** Why translation is not producing text right now, or null. */
-    val translationStatus: String? = null
+    val translationStatus: String? = null,
+    /** A summary of the captions so far, written by the offline AI. */
+    val summary: String? = null,
+    /** True while the offline AI is writing a summary or study notes. */
+    val aiBusy: Boolean = false,
+    /** Why the AI has nothing to show right now (no model, no captions, failure), or null. */
+    val aiMessage: String? = null
 )
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
@@ -122,6 +128,11 @@ class CaptionViewModel @Inject constructor(
          * returning keyword context (Requirement 13.6).
          */
         const val KEYWORD_CONTEXT_WINDOW = 2
+
+        const val MODEL_MISSING_MESSAGE =
+            "Download the offline AI in Settings to get summaries and study notes."
+        const val AI_FAILED_MESSAGE =
+            "The offline AI could not finish. Try again in a moment."
     }
 
     /** Session identifier; stable for the lifetime of this ViewModel instance. */
@@ -318,12 +329,20 @@ class CaptionViewModel @Inject constructor(
             // 4. Generate study notes from the session transcript (Requirement 13.2)
             val transcript = transcriptStore.getSession(sessionId)
             if (transcript.isNotEmpty()) {
-                try {
-                    val notes = aiAssistant.generateStudyNotes(transcript)
-                    _uiState.value = _uiState.value.copy(studyNotes = notes)
-                    Log.d(TAG, "Study notes generated for session $sessionId: ${notes.title}")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to generate study notes: ${e.message}")
+                if (!aiAssistant.isOnDeviceReady()) {
+                    _uiState.value = _uiState.value.copy(aiMessage = MODEL_MISSING_MESSAGE)
+                } else {
+                    _uiState.value = _uiState.value.copy(aiBusy = true, aiMessage = null)
+                    try {
+                        val notes = aiAssistant.generateStudyNotes(transcript)
+                        _uiState.value = _uiState.value.copy(studyNotes = notes)
+                        Log.d(TAG, "Study notes generated for session $sessionId: ${notes.title}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to generate study notes: ${e.message}")
+                        _uiState.value = _uiState.value.copy(aiMessage = AI_FAILED_MESSAGE)
+                    } finally {
+                        _uiState.value = _uiState.value.copy(aiBusy = false)
+                    }
                 }
             }
 
@@ -397,6 +416,49 @@ class CaptionViewModel @Inject constructor(
         viewModelScope.launch {
             val file = transcriptStore.exportAsText(sessionId)
             _uiState.value = _uiState.value.copy(exportedFile = file)
+        }
+    }
+
+    /** Writes a short summary of the captions so far with the offline AI. */
+    fun summarizeNow() = runAi { transcript ->
+        val text = aiAssistant.summarize(transcript)
+        _uiState.value = _uiState.value.copy(summary = text)
+    }
+
+    /** Writes study notes from the captions so far with the offline AI. */
+    fun makeNotesNow() = runAi { transcript ->
+        val notes = aiAssistant.generateStudyNotes(transcript)
+        _uiState.value = _uiState.value.copy(studyNotes = notes)
+    }
+
+    private fun runAi(work: suspend (List<CaptionSegment>) -> Unit) {
+        val state = _uiState.value
+        if (state.aiBusy) return
+        val transcript = state.captions
+        when {
+            transcript.isEmpty() ->
+                _uiState.value = state.copy(aiMessage = "There are no captions to work from yet.")
+            !aiAssistant.isOnDeviceReady() ->
+                _uiState.value = state.copy(aiMessage = MODEL_MISSING_MESSAGE)
+            else -> {
+                _uiState.value = state.copy(aiBusy = true, aiMessage = null)
+                viewModelScope.launch {
+                    try {
+                        work(transcript)
+                    } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                        _uiState.value = _uiState.value.copy(
+                            aiMessage = "This took too long. Try again, or with fewer captions."
+                        )
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.e(TAG, "The offline AI failed: ${e.message}")
+                        _uiState.value = _uiState.value.copy(aiMessage = AI_FAILED_MESSAGE)
+                    } finally {
+                        _uiState.value = _uiState.value.copy(aiBusy = false)
+                    }
+                }
+            }
         }
     }
 

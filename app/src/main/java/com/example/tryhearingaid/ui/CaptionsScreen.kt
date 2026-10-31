@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -107,7 +111,9 @@ fun CaptionsScreen(
         onExport = viewModel::exportTranscript,
         onToggleClassroom = viewModel::toggleClassroomMode,
         onTranslationToggle = viewModel::setTranslationEnabled,
-        onTranslationTarget = viewModel::selectTranslationTarget
+        onTranslationTarget = viewModel::selectTranslationTarget,
+        onSummarize = viewModel::summarizeNow,
+        onStudyNotes = viewModel::makeNotesNow
     )
 }
 
@@ -126,7 +132,9 @@ internal fun CaptionsScreenContent(
     onToggleClassroom: () -> Unit,
     modifier: Modifier = Modifier,
     onTranslationToggle: (Boolean) -> Unit = {},
-    onTranslationTarget: (CaptionLanguage) -> Unit = {}
+    onTranslationTarget: (CaptionLanguage) -> Unit = {},
+    onSummarize: () -> Unit = {},
+    onStudyNotes: () -> Unit = {}
 ) {
     Scaffold(
         modifier = modifier,
@@ -179,6 +187,12 @@ internal fun CaptionsScreenContent(
                     color = MaterialTheme.colorScheme.error
                 )
             }
+
+            AiNotesCard(
+                uiState = uiState,
+                onSummarize = onSummarize,
+                onStudyNotes = onStudyNotes
+            )
 
             // ── Caption list ──────────────────────────────────────────────────
             CaptionList(
@@ -235,6 +249,57 @@ private fun LanguageSelector(
                     },
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                 )
+            }
+        }
+    }
+}
+
+// ─── Summary and study notes (offline AI) ─────────────────────────────────────
+
+@Composable
+private fun AiNotesCard(
+    uiState: CaptionUiState,
+    onSummarize: () -> Unit,
+    onStudyNotes: () -> Unit
+) {
+    val notes = uiState.studyNotes
+    if (uiState.captions.isEmpty() && uiState.summary == null && notes == null && uiState.aiMessage == null) return
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .padding(12.dp)
+                .heightIn(max = 260.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text("Summary and study notes", style = MaterialTheme.typography.titleSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = onSummarize,
+                    enabled = !uiState.aiBusy && uiState.captions.isNotEmpty()
+                ) { Text("Summarize") }
+                OutlinedButton(
+                    onClick = onStudyNotes,
+                    enabled = !uiState.aiBusy && uiState.captions.isNotEmpty()
+                ) { Text("Study notes") }
+            }
+            if (uiState.aiBusy) {
+                Text(
+                    "The offline AI is working. This can take a minute or two.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            uiState.aiMessage?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+            uiState.summary?.let {
+                Text("Summary", style = MaterialTheme.typography.labelLarge)
+                Text(it, style = MaterialTheme.typography.bodyMedium)
+            }
+            if (notes != null) {
+                Text(notes.title, style = MaterialTheme.typography.labelLarge)
+                notes.keyTopics.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
+                Text(notes.summary, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

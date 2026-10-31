@@ -50,4 +50,10 @@ interface AIAssistant {
      * 5-second timeout; cloud 5xx retries once after 2 s then falls back to on-device.
      */
     suspend fun describeSound(category: SoundCategory, context: String): String
+
+    /**
+     * True when the offline AI can answer right now (its model is downloaded). Summaries and
+     * study notes need it when there is no internet.
+     */
+    fun isOnDeviceReady(): Boolean = true
 }
