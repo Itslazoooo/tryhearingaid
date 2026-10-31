@@ -119,12 +119,15 @@ $text"""
             parseStudyNotes(response, transcript)
         }
 
+    /**
+     * Sound descriptions are written ahead of time and need no model, download or internet, so
+     * they are instant and identical online and offline. [context] may carry "confidence NN percent".
+     */
     override suspend fun describeSound(category: SoundCategory, context: String): String =
-        withTimeout(shortTimeoutMs) {
-            val prompt = "Describe in one natural sentence what a ${category.name.lowercase().replace('_', ' ')} " +
-                    "sounds like in this context: $context"
-            executeWithFallback(prompt)
-        }
+        com.example.tryhearingaid.environmental.SoundDescriptions.describe(
+            category,
+            com.example.tryhearingaid.environmental.SoundDescriptions.confidenceFrom(context)
+        )
 
     // ── Vocabulary tracking ───────────────────────────────────────────────────
 
