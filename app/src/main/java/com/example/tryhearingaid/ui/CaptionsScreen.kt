@@ -105,7 +105,9 @@ fun CaptionsScreen(
         },
         onLanguageSelected = viewModel::selectLanguage,
         onExport = viewModel::exportTranscript,
-        onToggleClassroom = viewModel::toggleClassroomMode
+        onToggleClassroom = viewModel::toggleClassroomMode,
+        onTranslationToggle = viewModel::setTranslationEnabled,
+        onTranslationTarget = viewModel::selectTranslationTarget
     )
 }
 
@@ -122,7 +124,9 @@ internal fun CaptionsScreenContent(
     onLanguageSelected: (CaptionLanguage) -> Unit,
     onExport: () -> Unit,
     onToggleClassroom: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onTranslationToggle: (Boolean) -> Unit = {},
+    onTranslationTarget: (CaptionLanguage) -> Unit = {}
 ) {
     Scaffold(
         modifier = modifier,
@@ -156,6 +160,14 @@ internal fun CaptionsScreenContent(
                 onExport = onExport
             )
 
+            TranslationControls(
+                enabled = uiState.translationEnabled,
+                target = uiState.translationTarget,
+                status = uiState.translationStatus,
+                onToggle = onTranslationToggle,
+                onTarget = onTranslationTarget
+            )
+
             val problem = when {
                 uiState.isUnavailable -> "Speech recognition is not available on this phone."
                 else -> uiState.engineError
@@ -171,6 +183,7 @@ internal fun CaptionsScreenContent(
             // ── Caption list ──────────────────────────────────────────────────
             CaptionList(
                 segments = uiState.captions,
+                translations = uiState.translations,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -186,7 +199,8 @@ private fun LanguageSelector(
     languages: List<CaptionLanguage>,
     onSelected: (CaptionLanguage) -> Unit,
     enabled: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    label: String = "Recognition language"
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -199,7 +213,7 @@ private fun LanguageSelector(
             value = selected.displayName,
             onValueChange = {},
             readOnly = true,
-            label = { Text("Recognition language") },
+            label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
             enabled = enabled,
@@ -221,6 +235,44 @@ private fun LanguageSelector(
                     },
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                 )
+            }
+        }
+    }
+}
+
+// ─── Translation controls ─────────────────────────────────────────────────────
+
+@Composable
+private fun TranslationControls(
+    enabled: Boolean,
+    target: CaptionLanguage,
+    status: String?,
+    onToggle: (Boolean) -> Unit,
+    onTarget: (CaptionLanguage) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Translate captions", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Shows a translation under each caption. The first use downloads about 30 MB " +
+                        "per language over Wi-Fi; after that it works offline.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            androidx.compose.material3.Switch(checked = enabled, onCheckedChange = onToggle)
+        }
+        if (enabled) {
+            LanguageSelector(
+                selected = target,
+                languages = SUPPORTED_CAPTION_LANGUAGES,
+                onSelected = onTarget,
+                enabled = true,
+                label = "Translate into"
+            )
+            if (status != null) {
+                Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -277,6 +329,7 @@ private fun ControlRow(
 @Composable
 private fun CaptionList(
     segments: List<CaptionSegment>,
+    translations: Map<java.util.UUID, String>,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -306,7 +359,7 @@ private fun CaptionList(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(items = segments, key = { it.id.toString() }) { segment ->
-                CaptionSegmentCard(segment = segment)
+                CaptionSegmentCard(segment = segment, translation = translations[segment.id])
             }
         }
     }
@@ -324,7 +377,8 @@ private fun CaptionList(
 @Composable
 private fun CaptionSegmentCard(
     segment: CaptionSegment,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    translation: String? = null
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -374,6 +428,16 @@ private fun CaptionSegmentCard(
                 fontStyle = if (segment.isUncertain) FontStyle.Italic else FontStyle.Normal,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            // The translation, when there is one that differs from the original.
+            if (translation != null && !translation.equals(segment.text, ignoreCase = true)) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = translation,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }

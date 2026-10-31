@@ -118,6 +118,9 @@ dependencies {
     // Gson (JSON serialization for Room TypeConverters)
     implementation(libs.gson)
 
+    // Offline translation (Google ML Kit). Language packs of about 30 MB are downloaded on request.
+    implementation("com.google.mlkit:translate:17.0.3")
+
     // Offline speech recognition (Vosk). The JNA library must be the aar, as the Vosk project says.
     implementation("net.java.dev.jna:jna:5.13.0@aar")
     implementation("com.alphacephei:vosk-android:0.3.47")

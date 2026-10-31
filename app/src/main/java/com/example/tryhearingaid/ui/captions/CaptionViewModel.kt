@@ -11,6 +11,9 @@ import com.example.tryhearingaid.captions.CaptionEngine
 import com.example.tryhearingaid.captions.TranscriptStore
 import com.example.tryhearingaid.data.LocalUserFilesImpl
 import com.example.tryhearingaid.data.CaptionSegment
+import com.example.tryhearingaid.translation.NoTranslation
+import com.example.tryhearingaid.translation.TextTranslator
+import com.example.tryhearingaid.translation.TranslationResult
 import com.example.tryhearingaid.data.StudyNotes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -73,7 +76,14 @@ data class CaptionUiState(
     val studyNotes: StudyNotes? = null,
     val keywordContext: List<CaptionSegment> = emptyList(),
     val exportedFile: File? = null,
-    val audioFilePath: String? = null
+    val audioFilePath: String? = null,
+    /** Show a translation under each caption (Requirement 7: original and translated text). */
+    val translationEnabled: Boolean = false,
+    val translationTarget: CaptionLanguage = SUPPORTED_CAPTION_LANGUAGES[1],
+    /** Translated text by caption id; a caption without an entry is not translated yet. */
+    val translations: Map<UUID, String> = emptyMap(),
+    /** Why translation is not producing text right now, or null. */
+    val translationStatus: String? = null
 )
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
@@ -100,7 +110,8 @@ class CaptionViewModel @Inject constructor(
     private val captionEngine: CaptionEngine,
     private val transcriptStore: TranscriptStore,
     private val aiAssistant: AIAssistant,
-    @ApplicationContext private val appContext: Context
+    @ApplicationContext private val appContext: Context,
+    private val translator: TextTranslator = NoTranslation
 ) : ViewModel() {
 
     companion object {
@@ -133,6 +144,7 @@ class CaptionViewModel @Inject constructor(
         viewModelScope.launch {
             captionEngine.captions.collect { segments ->
                 _uiState.value = _uiState.value.copy(captions = segments)
+                translateNew(segments)
                 // Persist the latest segment added (if any).
                 segments.lastOrNull()?.let { latest ->
                     transcriptStore.saveSegment(latest, sessionId)
@@ -180,6 +192,49 @@ class CaptionViewModel @Inject constructor(
         if (wasActive) captionEngine.stop()
         _uiState.value = _uiState.value.copy(selectedLanguage = language)
         if (wasActive) captionEngine.start(language.code)
+    }
+
+    // ── Translation ───────────────────────────────────────────────────────────
+
+    private val pendingTranslations = mutableSetOf<UUID>()
+
+    fun setTranslationEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(translationEnabled = enabled, translationStatus = null)
+        if (enabled) translateNew(_uiState.value.captions)
+    }
+
+    fun selectTranslationTarget(language: CaptionLanguage) {
+        pendingTranslations.clear()
+        _uiState.value = _uiState.value.copy(
+            translationTarget = language,
+            translations = emptyMap(),
+            translationStatus = null
+        )
+        translateNew(_uiState.value.captions)
+    }
+
+    /** Translates each caption that has no translation yet. A failure shows a short reason. */
+    private fun translateNew(segments: List<CaptionSegment>) {
+        val state = _uiState.value
+        if (!state.translationEnabled) return
+        val from = state.selectedLanguage.code
+        val to = state.translationTarget.code
+        segments
+            .filter { it.id !in state.translations && pendingTranslations.add(it.id) }
+            .forEach { segment ->
+                viewModelScope.launch {
+                    val result = translator.translate(segment.text, from, to)
+                    pendingTranslations.remove(segment.id)
+                    val current = _uiState.value
+                    _uiState.value = when (result) {
+                        is TranslationResult.Text -> current.copy(
+                            translations = current.translations + (segment.id to result.text),
+                            translationStatus = null
+                        )
+                        is TranslationResult.Unavailable -> current.copy(translationStatus = result.reason)
+                    }
+                }
+            }
     }
 
     // ── Classroom mode ────────────────────────────────────────────────────────
